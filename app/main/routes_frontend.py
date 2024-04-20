@@ -2,7 +2,8 @@ import json
 import os
 import uuid
 from datetime import timedelta
-from flask import current_app, escape, make_response, request, send_file, render_template
+from markupsafe import escape
+from flask import current_app, make_response, request, send_file, render_template
 from pathlib import Path
 from ruamel.yaml import YAML
 from webargs import fields
