@@ -13,6 +13,7 @@ from .firmware import firmware_filename, minimum_firmware, firmware_upgrade_requ
 from .model import PicoBrewSession, PICO_SESSION
 from .routes_frontend import get_pico_recipes
 from .session_parser import active_brew_sessions, dirty_sessions_since_clean
+from .mqtt import publish_mqtt_message
 
 
 arg_parser = FlaskParser()
@@ -45,6 +46,7 @@ change_state_args = {
 @main.route('/API/pico/picoChangeState')
 @use_args(change_state_args, location='querystring')
 def process_change_state_request(args):
+    publish_mqtt_message(json.dumps(args), str(args['picoUID']) + "/state")
     return '\r\n'
 
 
@@ -183,6 +185,7 @@ get_recipe_args = {
 @use_args(get_recipe_args, location='querystring')
 def process_get_recipe(args):
     # TODO: figure out what to do with IBU/ABV tweaks
+    publish_mqtt_message(json.dumps(args), str(args['uid']) + "/RecipeLoaded")
     return '#{0}#'.format(get_recipe_by_id(args['rfid']))
 
 
@@ -233,6 +236,7 @@ def process_log(args):
     else:
         active_brew_sessions[uid].file.write('\n\t{},'.format(json.dumps(session_data)))
         active_brew_sessions[uid].file.flush()
+    publish_mqtt_message(json.dumps(args), str(args['uid']) + "/log")
     return '\r\n\r\n'
 
 

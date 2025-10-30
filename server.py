@@ -3,7 +3,7 @@ import os
 import sys
 
 # defaults
-PORT = os.environ.get('PORT', 80)
+PORT = os.environ.get('PORT', 9999)
 HOST = '0.0.0.0'
 
 if len(sys.argv) != 1 and len(sys.argv) != 3:
