@@ -32,6 +32,7 @@ def process_register(args):
     uid = args['uid']
     if uid not in active_brew_sessions:
         active_brew_sessions[uid] = PicoBrewSession()
+    publish_mqtt_message(json.dumps(args), str(args['uid']) + "/registration")
     return '#T#\r\n'
 
 
@@ -108,6 +109,8 @@ actions_needed_args = {
 @use_args(actions_needed_args, location='querystring')
 def process_get_actions_needed(args):
     if dirty_sessions_since_clean(args['uid'], MachineType.PICOBREW) >= 3:
+        args['actionNeeded'] = 'Machine requires cleaning'
+        publish_mqtt_message(json.dumps(args), str(args['uid']) + "/error")
         return '#7#'
     return '##'
 
@@ -125,6 +128,7 @@ error_args = {
 @use_args(error_args, location='querystring')
 def process_error(args):
     # TODO: Error Processing?
+    publish_mqtt_message(json.dumps(args), str(args['uid']) + "/error")
     return '\r\n'
 
 
@@ -185,6 +189,7 @@ get_recipe_args = {
 @use_args(get_recipe_args, location='querystring')
 def process_get_recipe(args):
     # TODO: figure out what to do with IBU/ABV tweaks
+    args['recipeName'] = get_recipe_name_by_id(args['rfid'])
     publish_mqtt_message(json.dumps(args), str(args['uid']) + "/RecipeLoaded")
     return '#{0}#'.format(get_recipe_by_id(args['rfid']))
 
@@ -211,7 +216,7 @@ def process_log(args):
     uid = args['uid']
     if uid not in active_brew_sessions or active_brew_sessions[uid].name == 'Waiting To Brew':
         create_new_session(uid, args['sesId'], args['sesType'])
-    session_data = {'time': ((datetime.utcnow() - datetime(1970, 1, 1)).total_seconds() * 1000),
+    session_data = {'time': ((datetime.now(datetime.timezone.utc) - datetime(1970, 1, 1)).total_seconds() * 1000),
                     'timeLeft': args['timeLeft'],
                     'step': args['step'],
                     'wort': args['wort'],

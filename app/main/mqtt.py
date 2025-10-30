@@ -5,7 +5,6 @@ from typing import Optional
 
 # --- Configuration ---
 # Default values used if environment variables are not set.
-DEFAULT_HOST = "broker.hivemq.com" # A public test broker for demonstration
 DEFAULT_PORT = 1883
 
 def publish_mqtt_message(message: str, topic: Optional[str] = None, client_id: Optional[str] = None) -> bool:
