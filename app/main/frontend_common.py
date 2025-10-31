@@ -1,4 +1,3 @@
-import os
 import subprocess
 from flask import render_template
 
@@ -18,16 +17,6 @@ def system_info():
 # memorize system information
 system_info = system_info()
 
-def build_info():
-    try:
-        build_info = os.getenv('COMMIT_SHA')
-    except Exception:
-        build_info = "unknown"
-
-    return build_info
-
-# memorize build information
-build_info = build_info()
 
 def platform():
     system = system_info
