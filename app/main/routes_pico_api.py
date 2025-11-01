@@ -216,7 +216,8 @@ def process_log(args):
     uid = args['uid']
     if uid not in active_brew_sessions or active_brew_sessions[uid].name == 'Waiting To Brew':
         create_new_session(uid, args['sesId'], args['sesType'])
-    session_data = {'time': ((datetime.now(tz=timezone.utc) - datetime(1970, 1, 1)).total_seconds() * 1000),
+    aware_naive_dt = datetime(1970, 1, 1).replace(tzinfo=timezone.utc)
+    session_data = {'time': ((datetime.now(tz=timezone.utc) - aware_naive_dt).total_seconds() * 1000),
                     'timeLeft': args['timeLeft'],
                     'step': args['step'],
                     'wort': args['wort'],
