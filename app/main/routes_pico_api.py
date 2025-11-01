@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import current_app
 from webargs import fields
 from webargs.flaskparser import use_args, FlaskParser
@@ -216,7 +216,7 @@ def process_log(args):
     uid = args['uid']
     if uid not in active_brew_sessions or active_brew_sessions[uid].name == 'Waiting To Brew':
         create_new_session(uid, args['sesId'], args['sesType'])
-    session_data = {'time': ((datetime.now(datetime.timezone.utc) - datetime(1970, 1, 1)).total_seconds() * 1000),
+    session_data = {'time': ((datetime.now(tz=timezone.utc) - datetime(1970, 1, 1)).total_seconds() * 1000),
                     'timeLeft': args['timeLeft'],
                     'step': args['step'],
                     'wort': args['wort'],
