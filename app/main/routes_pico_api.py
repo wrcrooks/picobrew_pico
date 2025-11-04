@@ -13,7 +13,7 @@ from .firmware import firmware_filename, minimum_firmware, firmware_upgrade_requ
 from .model import PicoBrewSession, PICO_SESSION
 from .routes_frontend import get_pico_recipes
 from .session_parser import active_brew_sessions, dirty_sessions_since_clean
-from .mqtt import publish_mqtt_message
+from .mqtt import parse_and_send
 
 
 arg_parser = FlaskParser()
@@ -32,7 +32,7 @@ def process_register(args):
     uid = args['uid']
     if uid not in active_brew_sessions:
         active_brew_sessions[uid] = PicoBrewSession()
-    publish_mqtt_message(json.dumps(args), str(args['uid']) + "/registration")
+    parse_and_send(1, uid, args)
     return '#T#\r\n'
 
 
@@ -47,7 +47,7 @@ change_state_args = {
 @main.route('/API/pico/picoChangeState')
 @use_args(change_state_args, location='querystring')
 def process_change_state_request(args):
-    publish_mqtt_message(json.dumps(args), str(args['picoUID']) + "/state")
+    parse_and_send(4, args['picoUID'], json.dumps(args), str(args['picoUID']) + "/state")
     return '\r\n'
 
 
@@ -110,7 +110,7 @@ actions_needed_args = {
 def process_get_actions_needed(args):
     if dirty_sessions_since_clean(args['uid'], MachineType.PICOBREW) >= 3:
         args['actionNeeded'] = 'Machine requires cleaning'
-        publish_mqtt_message(json.dumps(args), str(args['uid']) + "/error")
+        parse_and_send(json.dumps(args), str(args['uid']) + "/error")
         return '#7#'
     return '##'
 
@@ -128,7 +128,7 @@ error_args = {
 @use_args(error_args, location='querystring')
 def process_error(args):
     # TODO: Error Processing?
-    publish_mqtt_message(json.dumps(args), str(args['uid']) + "/error")
+    parse_and_send(json.dumps(args), str(args['uid']) + "/error")
     return '\r\n'
 
 
@@ -190,7 +190,7 @@ get_recipe_args = {
 def process_get_recipe(args):
     # TODO: figure out what to do with IBU/ABV tweaks
     args['recipeName'] = get_recipe_name_by_id(args['rfid'])
-    publish_mqtt_message(json.dumps(args), str(args['uid']) + "/RecipeLoaded")
+    parse_and_send(2, args['uid'], json.dumps(args), str(args['uid']) + "/RecipeLoaded")
     return '#{0}#'.format(get_recipe_by_id(args['rfid']))
 
 
@@ -242,7 +242,7 @@ def process_log(args):
     else:
         active_brew_sessions[uid].file.write('\n\t{},'.format(json.dumps(session_data)))
         active_brew_sessions[uid].file.flush()
-    publish_mqtt_message(json.dumps(args), str(args['uid']) + "/log")
+    parse_and_send(3, uid, json.dumps(args), str(args['uid']) + "/log")
     return '\r\n\r\n'
 
 
