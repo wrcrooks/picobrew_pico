@@ -1,34 +1,28 @@
 version: "3.8"
 services:
   nginx:
-    image: nginx:1.15-alpine
+    image: nginx:alpine-slim
     restart: unless-stopped
     command: "/bin/sh -c 'while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g \"daemon off;\"'"
     volumes:
-      - ./scripts/docker/nginx/conf:/etc/nginx/conf.d
-      - ./scripts/docker/nginx/certs:/certs
+      - <Host Docker Data Directory>/picobrew/nginx/conf:/etc/nginx/conf.d
+      - <Host Docker Data Directory>/picobrew/nginx/certs:/certs
+      - <Host Docker Data Directory>/picobrew/nginx/scripts:/scripts
     ports:
       - 80:80
       - 443:443
     links:
       - app
-  
+
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment: 
+    image: wrcrooks/picobrew_pico:latest
+    environment:
       FLASK_ENV: development
       PORT: 8080
     volumes:
-      - type: bind
-        source: ./app/recipes
-        target: /picobrew_pico/app/recipes
-      - type: bind
-        source: ./app/sessions
-        target: /picobrew_pico/app/sessions
-      - type: bind
-        source: ./app/firmware
-        target: /picobrew_pico/app/firmware
+      - <Host Docker Data Directory>/picobrew/app/recipes:/picobrew_pico/app/recipes
+      - <Host Docker Data Directory>/picobrew/app/sessions:/picobrew_pico/app/sessions
+      - <Host Docker Data Directory>/picobrew/app/firmware:/picobrew_pico/app/firmware
+      - <Host Docker Data Directory>/picobrew/config.yaml:/picobrew_pico/config.yaml
     ports:
       - 8080:8080

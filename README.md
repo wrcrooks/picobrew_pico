@@ -1,23 +1,20 @@
 # picobrew_pico
-![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/chiefwigms/picobrew_pico/docker-image.yml)
-![GitHub contributors](https://img.shields.io/github/contributors/chiefwigms/picobrew_pico)
-![GitHub commit activity](https://img.shields.io/github/commit-activity/m/chiefwigms/picobrew_pico)
+![GitHub contributors](https://img.shields.io/github/contributors/wrcrooks/picobrew_pico)
+![GitHub commit activity](https://img.shields.io/github/commit-activity/m/wrcrooks/picobrew_pico)
 
-![Docker Image Version (latest semver)](https://img.shields.io/docker/v/chiefwigms/picobrew_pico?logo=docker)
-![Docker Pulls](https://img.shields.io/docker/pulls/chiefwigms/picobrew_pico?logo=docker)
-![GitHub tag (latest SemVer pre-release)](https://img.shields.io/github/v/tag/chiefwigms/picobrew_pico?include_prereleases&sort=semver)
-![GitHub all releases](https://img.shields.io/github/downloads/chiefwigms/picobrew_pico/total)
-![GitHub release (by tag)](https://img.shields.io/github/downloads/chiefwigms/picobrew_pico/v0.0.1-beta6/total)
+![Docker Image Version (latest server)](https://img.shields.io/docker/v/wrcrooks/picobrew_pico?logo=docker)
+![Docker Pulls](https://img.shields.io/docker/pulls/wrcrooks/picobrew_pico?logo=docker)
 
-Allows for full control of the PicoBrew Pico S/C/Pro & Zymatic models.  Shout out to [@hotzenklotz](https://github.com/hotzenklotz/picobrew-server), Brian Moineau for PicoFerm API, @tmack8001 for Z series support & updates.  
-[Demo Server](http://ec2-3-136-112-93.us-east-2.compute.amazonaws.com/)
+**NOTE:** *This project is under active development. Please ensure you have the Docker volumes bound properly to prevent data loss while upgrading versions and/or switching between this image and the chiefwigms image*
+
+This is a modified version of chiefwigms' [picobrew_pico](https://github.com/chiefwigms/picobrew_pico) project, with added Home Assistant/MQTT Support. Allows for full local control of the PicoBrew Pico S/C/Pro & Zymatic models.
 
 ## Supported Devices:
 * Hot Side
-  * Pico S/C/Pro: fully featured
-  * Zymatic: fully featured
-  * ZSeries: fully featured
-  * PicoStill: fully featured
+  * Pico S/C/Pro: Fully featured ![TESTED](https://img.shields.io/badge/TESTED-green)
+  * Zymatic: Fully featured
+  * ZSeries: Fully featured
+  * PicoStill: Fully featured
     * Optional internal PicoStill T1/2/3/4 and Pressure Logging 
     * Firmware versions 0.0.30 - 0.0.35 (selectable)
     * PicoBrew Controlling Devices:
@@ -26,10 +23,12 @@ Allows for full control of the PicoBrew Pico S/C/Pro & Zymatic models.  Shout ou
       * Zymatic (no native support for controlling the PicoStill - limitation of firmware)
 * Cold Side (Fermentation)
   * PicoFerm (Beta - Currently terminates fermentation after 14 days)
-  * iSpindel: full session graphing
-  * Tilt: full session graphing
+  * iSpindel: Full session graphing
+  * Tilt: Full session graphing
 
 ## Features
+* Home Assistant Integration ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-white?logo=homeassistant
+)
 * Device Aliasing
 * Brew Sessions
   * Live Graphing
@@ -42,124 +41,139 @@ Allows for full control of the PicoBrew Pico S/C/Pro & Zymatic models.  Shout ou
   * **Note** The table for adding/removing/editing recipe steps has several validation checks in it, but there is always the possibility of ruining your Pico.  
   * *For Pico S/C/Pro Only*: DO NOT EDIT or MOVE Rows 1-3 (Preparing to Brew/Heating/Dough In).  Drain times should all be 0 except for Mash Out (2 minutes) and the last hop addition (5 minutes) (for example, if you only have Hops 1 & 2, set the drain time on Hops 2 to 5, and remove the Hops 3 and 4 rows)
 
-## Installation
-![GitHub tag (latest SemVer pre-release)](https://img.shields.io/github/v/tag/chiefwigms/picobrew_pico?include_prereleases&sort=semver)
-
-Refer to the [Releases Page](https://github.com/chiefwigms/picobrew_pico/releases) for steps to get up and running with your own Pico server with a Raspberry Pi device (recommended models include: Raspberry Pi Zero-W or Raspberry Pi 4).
-
-By default the hostname of the RaspberryPi device will be "raspberrypi" and is discoverable on your local network along with the "samba" (or network shares) for sessions and recipes. You can use these to view the files created by the server during interactions with the user and connected devices.
-
-### Debugging Issues
-
-There are two primary ways to help get additional details of errors that occur.
-
-First is to see what is happening in your local browser. Most modern browsers have "development tools" that are included (in Chrome "Settings > More Tools > Developer Tools") and from these there are usually a console log as well as a "Network" tab that shows all the network requests made by the existing experience/page.
-
-Second is to view the application logs from the included python server over an ssh or local keyboard+screen session.
-
-```
-sudo systemctl status rc.local -n <num-log-lines>
-```
-
-The remainder of this guide is oriented around creating a development environment for contributors.
-
-# Development Setup
+# Installation
+After some consideration, I have decided to only develop with the creation of a Docker image in mind. While I realize this requires some knowledge of containers to use, I ultimately believe this is the easiest way to install and manage for the end user, with platform-agnostic compatibility being a bonus.
 
 ## Requirements
+DNS Override (either through a router, RaspberryPi etc)  
+  - Your router needs to override DNS queries to `picobrew.com` with the local, private IP of the container. Guides:
+    - DD-WRT/Open-WRT etc : Add additional option added to dnsmasq.conf: `address=/picobrew.com/<Server IP running this code>`
 
-DNS Forwarding (either through a router, RaspberryPi etc)  
-  - Have a Raspberry Pi Zero W : https://albeec13.github.io/2017/09/26/raspberry-pi-zero-w-simultaneous-ap-and-managed-mode-wifi/
-  - DD-WRT/Open-WRT etc : Add additional option added to dnsmasq.conf: `address=/picobrew.com/<Server IP running this code>`
+### Running pre-packaged server via Docker or Docker-Compose ![Docker Image Version (latest server)](https://img.shields.io/docker/v/wrcrooks/picobrew_pico?logo=docker)
 
-### Option 1: Running pre packaged server via Docker or Docker-Compose ![Docker Image Version (latest semver)](https://img.shields.io/docker/v/chiefwigms/picobrew_pico?logo=docker)
-
-Docker v19.x (https://docs.docker.com/get-docker/)
+Docker v27.X (https://docs.docker.com/get-docker/)
 
 #### Setup/Run
 
-Setup the following directory structure for use by the server.
+##### Step 1: Create directory structure
+Set up the following directory structure for use by the server:
 ```
-app/
-  recipes/
-    pico/
-      archive/
-    zseries/
-      archive/
-    zymatic/
-      archive/
-  sessions/
-    brew/
-      active/
-      archive/
-    ferm/
-      active/
-      archive/
-    iSpindel/
-      active/
-      archive/
-    still/
-      active/
-      archive/
-    tilt/
-      active/
-      archive/
+picobrew/
+  app/
+    recipes/
+      pico/
+        archive/
+      zseries/
+        archive/
+      zymatic/
+        archive/
+    sessions/
+      brew/
+        active/
+        archive/
+      ferm/
+        active/
+        archive/
+      iSpindel/
+        active/
+        archive/
+      still/
+        active/
+        archive/
+      tilt/
+        active/
+        archive/
+  nginx/
+    certs/
+    conf/
+    scripts/
 ```
 
-Run server volume mounting the above directory structure.
+Commands to run on Docker host:
+```
+cd <Host Docker Data Directory>
+mkdir -p picobrew/app/recipes/pico/archive picobrew/app/recipes/zseries/archive picobrew/app/recipes/zymatic/archive picobrew/app/sessions/brew/active picobrew/app/sessions/brew/archive picobrew/app/sessions/ferm/active picobrew/app/sessions/ferm/archive picobrew/app/sessions/iSpindel/active picobrew/app/sessions/iSpindel/archive picobrew/app/sessions/still/active picobrew/app/sessions/still/archive picobrew/app/sessions/tilt/active picobrew/app/sessions/tilt/archive picobrew/nginx/conf picobrew/nginx/certs picobrew/nginx/scripts
+```
 
-##### (Optional) Step 1: Generate SSL Certs
+Run server volume mounting the above directory structure. Below are examples for use of these directories when running the app. More on this later.
+  - Docker Compose (example snippet only):
+    ```
+    volumes:
+      - <Host Docker Data Directory>/picobrew/nginx/conf:/etc/nginx/conf.d
+      - <Host Docker Data Directory>/picobrew/nginx/certs:/certs
+      - <Host Docker Data Directory>/picobrew/nginx/scripts:/scripts
+    ...
+    volumes:
+      - <Host Docker Data Directory>/picobrew/app/recipes:/picobrew_pico/app/recipes
+      - <Host Docker Data Directory>/picobrew/app/sessions:/picobrew_pico/app/sessions
+      - <Host Docker Data Directory>/picobrew/app/firmware:/picobrew_pico/app/firmware
+      - <Host Docker Data Directory>/picobrew/config.yaml:/picobrew_pico/config.yaml
+    ```
+  - Docker Command (example only):
+    ```
+    docker run -d -it -p 80:80 --name picobrew_pico \
+    --mount type=bind,source=<Host Docker Data Directory>/picobrew/app/recipes,target=/picobrew_pico/app/recipes \
+    --mount type=bind,source=<Host Docker Data Directory>/picobrew/app/sessions,target=/picobrew_pico/app/sessions \
+    --mount type=bind,source=<Host Docker Data Directory>/picobrew/app/firmware,target=/picobrew_pico/app/firmware \
+    --mount type=bind,source=<Host Docker Data Directory>/picobrew/config.yaml,target=/picobrew_pico/config.yaml \
+    wrcrooks/picobrew_pico
+    ```
 
+##### Step 2: Generate SSL Certs (Optional but *highly* recommended)
+![RECOMMENDED](https://img.shields.io/badge/RECOMMENDED-green)
 If you are looking to support a ZSeries device which requires HTTP+SSL communication we need to generate some self-signed certificates to place in front of the flask app. These will be used when running nginx to terminate SSL connection before sending the requests for processing by flask.
 
-```
-./scripts/docker/nginx/ssl_certificates.sh
-```
+1. Ensure you have OpenSSL installed on the Docker host machine (Example for Debian: `sudo apt install openssl`)
+2. On Docker host machine, run the following commands:
+  - `cd <Host Docker Data Directory>/picobrew/nginx`
+  - `sudo su` *(if not running as root)*
+  - `wget -qO- https://raw.githubusercontent.com/wrcrooks/picobrew_pico/refs/heads/master/scripts/docker/nginx/ssl_certificates.sh | bash`
+    - **NOTE:** The intent of this script is to generate the required SSL certificates that NGINX needs to emulate the picobrew.com certificate. Generally speaking, it's bad practice to execute bash scripts directly from the internet. I'd recommend reviewing [the script](https://raw.githubusercontent.com/wrcrooks/picobrew_pico/refs/heads/master/scripts/docker/nginx/ssl_certificates.sh) first to confirm the intent and commands being executed
 
-On MacOS you can add permanent trust for the Certificate Authority (yourself) if you use Chrome and/or Safari this makes it so that the authority of the certificate generated above is trusted. Only these browsers check keychain access to get a list of CAs whereas Firefox stores its own list of trusted CAs in the browser.
-
-```
-sudo security add-trusted-cert -d -r trustAsRoot -k /Library/Keychains/System.keychain $(pwd)/scripts/docker/nginx/certs/bundle.crt
-```
-
-##### Step 2: Run Flask Server (optionally with `docker run` or with `docker-compose`)
+##### Step 3: Start Docker containers
 
 Either: 
 * provide all variables to docker command directly
 * use the repository's docker-compose.yml (which will also include a working SSL enabled nginx configuration given you have setup certificates correctly with `./scripts/docker/nginx/ssl_certificates.sh`)
 * use the repository's docker-compose-no-ssl.yml for a non-SSL intall (this should work for non ZSeries devices)
 
-###### Option 1: Docker Run (without SSL support or external SSL termination)
+###### Environment Variables:
+All of these variables are optional, but essential to the Home Assistant integration working.
+| ENV Variable | Value | Notes |
+| ------------ | ----- | ----- |
+| MQTT_BROKER_HOST | \<MQTT Server IP\> |
+| MQTT_PORT | 1883 |
+| MQTT_TOPIC_PREFIX | \<pico\> |
+| MQTT_USER | \<MQTT Username\> |
+| MQTT_PASS | \<MQTT Password\> |
+| HOMEASSISTANT | True | *Overrides 'MQTT_TOPIC_PREFIX'* |
 
-Running straight with docker is useful for easy setups which don't require SSL connections (aka non ZSeries brew setups) and/or for those that leveraging another existing system to handle the SSL connections (ie. mitmproxy, nginx, etc).
+To add these variables to the Docker Compose method, modify your docker-compose.yml file under the "environment" of the "app" container. Example:
+```
+    environment:
+      FLASK_ENV: development
+      PORT: 8080
+      MQTT_BROKER_HOST: 192.168.1.100
+      MQTT_PORT: 1883
+      MQTT_TOPIC_PREFIX: pico
+      MQTT_USER: mqtt
+      MQTT_PASS: supersecretpassword
+      HOMEASSISTANT: True
+```
 
+To add these variables to the Docker Run method, add them to your command using the `-e` flag. Example:
 ```
 docker run -d -it -p 80:80 --name picobrew_pico \
-  --mount type=bind,source=<absolute-path-to-recipes>,target=/picobrew_pico/app/recipes \
-  --mount type=bind,source=<absolute-path-to-sessions>,target=/picobrew_pico/app/sessions \
-  chiefwigms/picobrew_pico
+--mount type=bind,source=<Host Docker Data Directory>/picobrew/app/recipes,target=/picobrew_pico/app/recipes \
+--mount type=bind,source=<Host Docker Data Directory>/picobrew/app/sessions,target=/picobrew_pico/app/sessions \
+--mount type=bind,source=<Host Docker Data Directory>/picobrew/app/firmware,target=/picobrew_pico/app/firmware \
+--mount type=bind,source=<Host Docker Data Directory>/picobrew/config.yaml,target=/picobrew_pico/config.yaml \
+-e MQTT_BROKER_HOST="192.168.1.100" -e MQTT_PORT="1883" -e MQTT_TOPIC_PREFIX="pico" -e MQTT_USER="mqtt" -e MQTT_PASS="supersecretpassword" -e HOMEASSISTANT="True" \
+wrcrooks/picobrew_pico
 ```
 
-To view logs check the running docker containers and tail the specific instance's logs directly via docker.
-
-```
-docker ps
-CONTAINER ID        IMAGE                     COMMAND                  CREATED             STATUS              PORTS                NAMES
-3cfda85cd90c        chiefwigms/picobrew_pico   "/bin/sh -c 'python3…"   45 seconds ago      Up 45 seconds       0.0.0.0:80->80/tcp   picobrew_pico
-```
-
-```
-docker logs -f 3cfda85cd90c
-WebSocket transport not available. Install eventlet or gevent and gevent-websocket for improved performance.
- * Serving Flask app "app" (lazy loading)
- * Environment: production
-   WARNING: This is a development server. Do not use it in a production deployment.
-   Use a production WSGI server instead.
- * Debug mode: off
- * Running on http://0.0.0.0:80/ (Press CTRL+C to quit)
-```
-
-###### Option 2: Docker Compose (with SSL support via a dedicated nginx container)
-
+###### Option 1: Docker Compose (with SSL support via a dedicated nginx container)
+![RECOMMENDED](https://img.shields.io/badge/RECOMMENDED-green)
 To run a setup with http and https and want to have the ssl termination handled by the included nginx `docker-compose` is the easiest configuration to go with.
 
 ```
@@ -178,8 +192,43 @@ To view logs use the aliases service name `app` to view logs via the docker-comp
 docker-compose logs -f app
 ```
 
-### Option 2: Running server via Python directly (optionally terminating ssl elsewhere manually)
-Python >= 3.6.9  
+###### Option 2: Docker Run
+
+Running straight with docker is useful for easy setups which don't require SSL connections (aka non ZSeries brew setups) and/or for those that leveraging another existing system to handle the SSL connections (ie. mitmproxy, nginx, etc).
+
+```
+docker run -d -it -p 80:80 --name picobrew_pico \
+--mount type=bind,source=<Host Docker Data Directory>/picobrew/app/recipes,target=/picobrew_pico/app/recipes \
+--mount type=bind,source=<Host Docker Data Directory>/picobrew/app/sessions,target=/picobrew_pico/app/sessions \
+--mount type=bind,source=<Host Docker Data Directory>/picobrew/app/firmware,target=/picobrew_pico/app/firmware \
+--mount type=bind,source=<Host Docker Data Directory>/picobrew/config.yaml,target=/picobrew_pico/config.yaml \
+wrcrooks/picobrew_pico
+```
+
+To view logs check the running docker containers and tail the specific instance's logs directly via docker.
+
+```
+docker ps
+CONTAINER ID        IMAGE                     COMMAND                  CREATED             STATUS              PORTS                NAMES
+3cfda85cd90c        wrcrooks/picobrew_pico    "/bin/sh -c 'python3…"   45 seconds ago      Up 45 seconds       0.0.0.0:80->80/tcp   picobrew_pico
+```
+
+```
+docker logs -f 3cfda85cd90c
+WebSocket transport not available. Install eventlet or gevent and gevent-websocket for improved performance.
+ * Serving Flask app "app" (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+ * Running on http://0.0.0.0:80/ (Press CTRL+C to quit)
+```
+
+### Option 3: Running server via Python directly [Development only] (optionally terminating ssl elsewhere manually)
+![ADVANCED](https://img.shields.io/badge/ADVANCED-grey)
+
+Requirements:
+- Python >= 3.6.9  
 
 #### Setup/Run
 Clone this repo, then run  
@@ -188,3 +237,8 @@ Clone this repo, then run
 
 ## Disclaimer
 Except as represented in this agreement, all work product by Developer is provided ​“AS IS”. Other than as provided in this agreement, Developer makes no other warranties, express or implied, and hereby disclaims all implied warranties, including any warranty of merchantability and warranty of fitness for a particular purpose.
+
+# Debugging
+1. `docker ps` and grab the "CONTAINER ID" from the "picobrew_pico" container
+2. `docker logs -f <CONTAINER ID>`
+
