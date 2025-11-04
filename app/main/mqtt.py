@@ -128,12 +128,12 @@ def parse_and_send(itype: int, uid: str, message: str, topic: Optional[str] = No
                         "icon": "mdi:clock-check"
                     }
                 },
-                "state_topic":"homeassistant/pico/state",
+                "state_topic":"homeassistant/pico/" + str(uid) + "/state",
                 "qos": 2
             }
             publish_mqtt_message(json.dumps(msg), 'homeassistant/device/pico/' + str(uid) + '/config')
         else:
-            topic_complete = "homeassistant/pico/state"
+            topic_complete = "homeassistant/pico/" + str(uid) + "/state"
             messageJSON = json.loads(message)
             bodyJSON = {}
             if itype == 2:
