@@ -15,6 +15,7 @@ class MachineType(str, Enum):
     ZYMATIC = 'Zymatic'
     ISPINDEL = 'iSpindel'
     TILT = 'Tilt'
+    UNIFIED = "Unified"
 
 
 class SessionType(str, Enum):
@@ -65,6 +66,8 @@ def recipe_path(machineType, archived=False):
         filepath = filepath.joinpath('zymatic')
     elif machineType is MachineType.ZSERIES:
         filepath = filepath.joinpath('zseries')
+    elif machineType is MachineType.UNIFIED:
+        filepath = filepath.joinpath('unified')
     else:
         raise Exception("recipe_path: unsupported machine type {machineType}")
 

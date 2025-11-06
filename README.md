@@ -69,6 +69,8 @@ picobrew/
         archive/
       zymatic/
         archive/
+      unified/
+        archive/
     sessions/
       brew/
         active/
@@ -94,7 +96,7 @@ picobrew/
 Commands to run on Docker host:
 ```
 cd <Host Docker Data Directory>
-mkdir -p picobrew/app/recipes/pico/archive picobrew/app/recipes/zseries/archive picobrew/app/recipes/zymatic/archive picobrew/app/sessions/brew/active picobrew/app/sessions/brew/archive picobrew/app/sessions/ferm/active picobrew/app/sessions/ferm/archive picobrew/app/sessions/iSpindel/active picobrew/app/sessions/iSpindel/archive picobrew/app/sessions/still/active picobrew/app/sessions/still/archive picobrew/app/sessions/tilt/active picobrew/app/sessions/tilt/archive picobrew/nginx/conf picobrew/nginx/certs picobrew/nginx/scripts
+mkdir -p picobrew/app/recipes/pico/archive picobrew/app/recipes/zseries/archive picobrew/app/recipes/zymatic/archive picobrew/app/recipes/unified/archive picobrew/app/sessions/brew/active picobrew/app/sessions/brew/archive picobrew/app/sessions/ferm/active picobrew/app/sessions/ferm/archive picobrew/app/sessions/iSpindel/active picobrew/app/sessions/iSpindel/archive picobrew/app/sessions/still/active picobrew/app/sessions/still/archive picobrew/app/sessions/tilt/active picobrew/app/sessions/tilt/archive picobrew/nginx/conf picobrew/nginx/certs picobrew/nginx/scripts
 ```
 
 Run server volume mounting the above directory structure. Below are examples for use of these directories when running the app. More on this later.

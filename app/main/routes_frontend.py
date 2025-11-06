@@ -655,8 +655,8 @@ def is_ajax(request):
 
 
 def load_redux_recipes(include_archived=True):
-    synced_files = list(recipe_path(MachineType.ZSERIES).glob(file_glob_pattern))
-    archived_files = list(recipe_path(MachineType.ZSERIES, True).glob(file_glob_pattern))
+    synced_files = list(recipe_path(MachineType.UNIFIED).glob(file_glob_pattern))
+    archived_files = list(recipe_path(MachineType.UNIFIED, True).glob(file_glob_pattern))
 
     files = synced_files
     if include_archived:
