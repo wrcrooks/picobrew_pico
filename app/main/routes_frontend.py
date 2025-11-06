@@ -1,7 +1,7 @@
 import json
 import os
 import uuid
-from datetime import timedelta
+from datetime import timedelta, datetime
 from markupsafe import escape
 from flask import current_app, make_response, request, send_file, render_template
 from pathlib import Path
@@ -16,14 +16,14 @@ from .config import (MachineType, SessionType, recipe_path,
                      brew_archive_sessions_path, ferm_archive_sessions_path, still_archive_sessions_path, iSpindel_archive_sessions_path, tilt_archive_sessions_path)
 from .frontend_common import render_template_with_defaults
 from .recipe_import import import_recipes
-from .recipe_parser import PicoBrewRecipe, ZymaticRecipe, ZSeriesRecipe
+from .recipe_parser import PicoBrewRecipe, ZymaticRecipe, ZSeriesRecipe, ReduxRecipe
 from .session_parser import (_paginate_sessions, list_session_files,
                              load_ferm_session, load_still_session, load_iSpindel_session, load_tilt_session,
                              dirty_sessions_since_clean, last_session_metadata, BrewSessionType,
                              get_brew_graph_data, get_ferm_graph_data, get_still_graph_data, get_iSpindel_graph_data, get_tilt_graph_data,
                              active_brew_sessions, active_ferm_sessions, active_still_sessions, active_iSpindel_sessions, active_tilt_sessions,
                              add_invalid_session, get_invalid_sessions, load_brew_sessions)
-
+from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION
 
 file_glob_pattern = "[!._]*.json"
 yaml = YAML()
@@ -474,6 +474,67 @@ def delete_file():
     return 'Delete Filename: Unsupported file type specified {}'.format(body['type']), 418
 
 
+
+def format_datetime_filter(value, format="%m/%d/%Y"):
+    try:
+        datetime_object = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S.%f")
+    except Exception:
+        datetime_object = datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+    value = datetime_object.strftime(format)
+    return value
+main.add_app_template_filter(format_datetime_filter, 'format_datetime')
+
+@main.route('/recipes')
+def _recipes():
+    global redux_recipes, invalid_recipes
+    redux_recipes = load_redux_recipes()
+    recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
+    return render_template_with_defaults('redux_recipes.html', recipes=recipes_dict, invalid=invalid_recipes.get(MachineType.ZSERIES, set()))
+
+#   Recipe: /API/pico/getRecipe?rfid={rfid}
+# Response: HTML
+get_recipe_args = {
+    'rfid': fields.Str(required=True)      # 14 character alpha-numeric PicoPak RFID
+}
+
+@main.route('/recipe')
+@use_args(get_recipe_args, location='querystring')
+def _recipe(args):
+    global redux_recipes, invalid_recipes
+    redux_recipes = load_redux_recipes()
+    recipe = new_zymatic_recipe()
+    for r in redux_recipes:
+        if r.id == args['rfid']:
+            recipe = json.loads(json.dumps(r, default=lambda r: r.__dict__))
+    GB_labels = [f['Name'] for f in recipe['Fermentables']]
+    GB_amounts = [f['Amount'] for f in recipe['Fermentables']]
+    GRAIN_BILL_DATA = {
+        'labels': GB_labels, 'data': GB_amounts
+    }
+    HB_labels = [h['Name'] for h in recipe['Hops']]
+    HB_amounts = [h['Amount'] for h in recipe['Hops']]
+    HOPS_BILL_DATA = {
+        'labels': HB_labels, 'data': HB_amounts
+    }
+    wortCurveData = []
+    for s in recipe['MachineSteps']:
+        for m in range(s['Time']):
+            wortCurveData.append(int(s['Temperature']))
+    for s in range(len(recipe['BoilSteps'])):
+        for k in ZSERIES_LOCATION.keys():
+            if ZSERIES_LOCATION[k] == str(recipe['BoilSteps'][s]['Location']):
+                recipe['BoilSteps'][s]['Location'] = k.replace("Adjunct", "Adjunct ")
+    for s in range(len(recipe['WhirlpoolSteps'])):
+        for k in ZSERIES_LOCATION.keys():
+            if ZSERIES_LOCATION[k] == str(recipe['WhirlpoolSteps'][s]['Location']):
+                recipe['WhirlpoolSteps'][s]['Location'] = k.replace("Adjunct", "Adjunct ")
+    for s in range(len(recipe['MachineSteps'])):
+        for k in ZSERIES_LOCATION.keys():
+            if ZSERIES_LOCATION[k] == str(recipe['MachineSteps'][s]['StepLocation']):
+                recipe['MachineSteps'][s]['StepLocation'] = k.replace("Adjunct", "Adjunct ").replace("PassThru", "Pass Through")
+    return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData)
+
+
 @main.route('/pico_recipes')
 def _pico_recipes():
     global pico_recipes, invalid_recipes
@@ -592,6 +653,25 @@ def is_ajax(request):
     """
     return request.headers.get('X_REQUESTED_WITH') == "XMLHttpRequest"
 
+
+def load_redux_recipes(include_archived=True):
+    synced_files = list(recipe_path(MachineType.ZSERIES).glob(file_glob_pattern))
+    archived_files = list(recipe_path(MachineType.ZSERIES, True).glob(file_glob_pattern))
+
+    files = synced_files
+    if include_archived:
+        files += archived_files
+
+    current_app.logger.info(f'load_redux_recipes : {len(synced_files)} synced ; {len(archived_files)} archived ')
+    recipes = [load_redux_recipe(file) for file in files]
+    return list(sorted(filter(lambda x: x.name != None, recipes), key=lambda x: x.name))
+
+def load_redux_recipe(file):
+    recipe = ReduxRecipe()
+    parse_recipe(MachineType.ZSERIES, recipe, file)
+
+    recipe.name_escaped = escape(recipe.name).replace(" ", "_")
+    return recipe
 
 def load_pico_recipes(include_archived=True):
     synced_files = list(recipe_path(MachineType.PICOBREW).glob(file_glob_pattern))

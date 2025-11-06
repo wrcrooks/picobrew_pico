@@ -400,3 +400,69 @@ def PicoBrewRecipeImport(recipe, rfid=None):
     if not filename.exists():
         with open(filename, "w") as file:
             json.dump(r, file, indent=4, sort_keys=True)
+
+
+class ReduxRecipe():
+    def __init__(self):
+        self.id = None
+        self.name = None
+        self.notes = None
+        self.name_ = None
+        self.abv_tweak = None
+        self.ibu_tweak = None
+        self.abv = None
+        self.ibu = None
+        self.is_pico = True
+        self.is_archived = False
+        self.image = None
+        self.steps = []
+
+    def parse(self, file):
+        recipe = None
+        with open(file) as f:
+            recipe = json.load(f)
+        self.id = recipe.get('RecipeGUID', 'XXXXXXXXXXXXXX') or 'XXXXXXXXXXXXXX'
+        self.name = recipe['VM']['Recipe']['Name'] or 'Empty Recipe'
+        self.name_ = self.name.replace(" ", "_").replace("\'", "")
+        self.notes = recipe.get('notes', None) or None
+        self.abv_tweak = recipe.get('abv_tweak', -1) or -1
+        self.ibu_tweak = recipe.get('ibu_tweak', -1) or -1
+        self.abv = recipe['VM']['Recipe']['ABV'] or 6.0
+        self.ibu = recipe.get('ibu', 40) or 40
+        self.image = recipe.get('image', '') or ''
+        self.is_archived = "/archive/" in str(file)
+        self.author = recipe['VM']['Recipe']['Author'] or 'Unattributed'
+        self.OG = recipe['VM']['Recipe']['OG'] or 1.050
+        self.FG = recipe['VM']['Recipe']['FG'] or 1.010
+        self.SRM = recipe['VM']['Recipe']['SRM'] or 10.0
+        self.CreationDate = recipe['VM']['Recipe']['CreationDate'] or "2000-01-28T17:31:29.127"
+        self.TastingNotes = recipe['VM']['Recipe']['TastingNotes'] or "No Tasting Notes"
+        self.BeerStyle = recipe['VM']['Recipe']['BeerStyle'] or []
+        self.UseMetric = recipe['UseMetric'] or False
+        self.Fermentables = recipe['VM']['Recipe']['Fermentables'] or []
+        self.Hops = recipe['VM']['Recipe']['Hops'] or []
+        self.MachineSteps = recipe['VM']['Recipe']['MachineSteps'] or []
+        self.WaterStats = recipe['VM']['Content']['Sections'][0]['Stats'] or []
+        self.WaterAmendments = recipe['VM']['Recipe']['Amendments'] or []
+        self.MashType = recipe['VM']['Recipe']['MashType'] or 0
+        self.MashSteps = recipe['VM']['Recipe']['MashSteps'] or []
+        self.BoilSteps = recipe['VM']['Recipe']['BoilSteps'] or []
+        self.IsFirstWort = str(recipe['VM']['Recipe']['IsFirstWort']) or 'False'
+        self.WhirlpoolSteps = recipe['VM']['Recipe']['WhirlpoolSteps'] or []
+        self.WhirlpoolHops = recipe['VM']['Recipe']['WhirlpoolHops'] or []
+        self.Yeast = recipe['VM']['Recipe']['Yeast'] or []
+        self.FermentationSteps = recipe['VM']['Recipe']['FermentationSteps'] or []
+        self.DryHops = recipe['VM']['Recipe']['DryHops'] or []
+        self.HumanBrewingSteps = recipe['VM']['Recipe']['HumanBrewingSteps'] or []
+        self.SpecialBrewingInstructions = recipe['VM']['Content']['SpecialBrewingInstructions'] or ""
+        # if 'steps' in recipe:
+        #     for recipe_step in recipe['steps']:
+        #         step = PicoBrewRecipeStep()
+        #         step.name = recipe_step.get('name', 'Empty Step') or 'Empty Step'
+        #         step.location = recipe_step.get('location', 'PassThru') or 'PassThru'
+        #         if step.location not in PICO_LOCATION:
+        #             raise ValueError(f'step.location provided {step.location} is not supported by Pico machine type')
+        #         step.temperature = 70 if 'temperature' not in recipe_step else int(recipe_step['temperature'])
+        #         step.step_time = 0 if 'step_time' not in recipe_step else int(recipe_step['step_time'])
+        #         step.drain_time = 0 if 'drain_time' not in recipe_step else int(recipe_step['drain_time'])
+        #         self.steps.append(step)

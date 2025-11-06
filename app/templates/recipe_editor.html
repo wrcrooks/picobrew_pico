@@ -1,0 +1,647 @@
+{% extends "base.html" %}
+{% block content %}
+<script src="/static/js/server_management.js"></script>
+<script src="/static/js/convert_units.js"></script>
+<script src="/static/js/pico_image.js"></script>
+<script src="/static/js/base_recipe.js"></script>
+<script src="/static/js/pico_recipe.js"></script>
+<script>var tables = {};</script>
+{% include "units_selector.html" %}
+{% with recipe_type='pico' %}
+    <div class="container recipe-container">
+        <div class="row">
+            <div class="col-md-3 text-center">
+                <img src="/static/img/SRM/srm_{{'%.0f' | format(recipe['SRM'] | float)}}.png" alt="Puff Doggie Hops AI Beer" class="img-fluid" style="max-height: 200px;">
+            </div>
+            <div class="col-md-9">
+                <h1 class="mb-2">{{ recipe['name'] }}</h1>
+                <p class="text-muted">{{ recipe['TastingNotes'] }}</p>
+                <p class="text-muted small">Designed by {{recipe['author']}} on {{ recipe['CreationDate'] | format_datetime("%m/%d/%Y") }}</p>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="small text-uppercase text-muted">Style</div>
+                    <div class="small text-uppercase text-muted">Units</div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="mb-0"><h4 class="mb-0">{{ recipe['BeerStyle']['StyleNameCode'] }}</h4><p class="text-muted small" class="mb-0">{{recipe['BeerStyle']['StyleGuide']}}: {{recipe['BeerStyle']['CatNumCode']}}.{{recipe['BeerStyle']['CatLettCode']}}</p></div>
+                    <div class="mb-0"><h4 class="mb-0">{{ 'Imperial (Gal, Lb, Oz, °F)' if not recipe['UseMetric'] else 'UH OH... METRIC' }}</h4><p></p></div> <!-- TODO: Metric?  -->
+                </div>
+            </div>
+        </div>
+        <div class="row text-center stats-box">
+            <div class="col-1"></div>
+            <div class="col-sm-2 col-3">
+                <div class="stat-value">1.086</div>
+                <div class="stat-label">OG</div>
+            </div>
+            <div class="col-sm-2 col-3">
+                <div class="stat-value">1.012</div>
+                <div class="stat-label">FG</div>
+            </div>
+            <div class="col-sm-2 col-3">
+                <div class="stat-value">92</div>
+                <div class="stat-label">IBU</div>
+            </div>
+            <div class="col-sm-2 col-3">
+                <div class="stat-value">10</div>
+                <div class="stat-label">SRM</div>
+            </div>
+            <div class="col-sm-2 col-3">
+                <div class="stat-value">9.6%</div>
+                <div class="stat-label">ABV</div>
+            </div>
+            <div class="col-1"></div>
+        </div>
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title text-center">Grain Bill</h5>
+                        <div style="height: 150px; width: 150px; margin: 10px auto;">
+                            <canvas id="grainBillChart"></canvas>
+                        </div>
+                        <ul class="list-unstyled small mt-3">
+                            {% for f in recipe['Fermentables']|sort(attribute='Amount',reverse=true) %}
+                            <li class="d-flex justify-content-between">
+                                <div>{{ f['Name'] }}</div>
+                                <div>{{ f['Amount'] }}</div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title text-center">Hop Bill</h5>
+                        <div style="height: 150px; width: 150px; margin: 10px auto;">
+                            <canvas id="hopBillChart"></canvas>
+                        </div>
+                        <ul class="list-unstyled small mt-3 text-center">
+                            {% for f in recipe['Hops']|sort(attribute='Amount',reverse=true) %}
+                            <li class="d-flex justify-content-between">
+                                <div>{{ f['Name'] }} (Location: {{ f['Location'] }})</div>
+                                <div>{{ f['Amount'] }}</div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title text-center">Wort Curve</h5>
+                        <div style="height: 200px; margin-bottom: 10px;">
+                            <canvas id="wortCurveChart"></canvas>
+                        </div>
+                        <p class="small mb-0 text-muted">Brew Time (Est.): **4 hrs and 19 mins**</p>
+                        <p class="small mb-0 text-muted">Chill Time (Est.): **2 hrs and 15 mins**</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr>
+        <h3 class="card-header-custom mb-3 pl-3 stats-box">WATER</h3>
+        <div class="row mb-3">
+            <div class="col-12">
+                {% for s in recipe['WaterStats'] %}
+                <p class="mb-1 text-muted ml-1"><b>{{ s['Item1'] }}:</b> {{ s['Item2'] }}</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% if recipe['WaterAmendments']|length > 0 %}
+        <div class="row justify-content-center">
+            <div class="col-10">
+                <p class="small text-muted text-center">Water Amendments</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Ingredient</th>
+                            <th>Amount</th>
+                            <th>Units</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for a in recipe['WaterAmendments'] %}
+                        <tr>
+                            <td>{{ a['Name'] }}</td>
+                            <td>{{ a['Amount'] }}</td>
+                            <td>{{ 'oz' if a['Units'] == None else '?' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+        <hr>
+        <h3 class="card-header-custom mb-3 pl-3 stats-box">MASH / FERMENTABLES</h3>
+        <div class="row mb-3">
+            <div class="col-12">
+                <p class="mb-1 text-muted ml-1"><b>Mash Type:</b> {{ ('Single Step Infusion With Mash Out') if (recipe['MashType'] == 3) else (('Custom') if (recipe['MashType'] == 2) else (('High Efficiency Multi Step') if (recipe['MashType'] == 1) else (('Single Step Infusion') if (recipe['MashType'] == 0) else ('Unknown')))) }}</p>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-10">
+                <p class="small text-muted text-center">Mash Steps</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Step</th>
+                            <th>Temp (°F)</th>
+                            <th>Time (m)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in recipe['MashSteps'] %}
+                        <tr>
+                            <td>{{ s['Name'] }}</td>
+                            <td>{{ s['Temp'] }}</td>
+                            <td>{{ s['Time'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <hr/>
+                <p class="small text-muted text-center">Fermentables</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Ingredient</th>
+                            <th>Amount (lbs)</th>
+                            <th>Color (pts)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for f in recipe['Fermentables'] %}
+                        <tr>
+                            <td>{{ f['Name'] }}</td>
+                            <td>{{ f['Amount'] }}</td>
+                            <td>{{ "%.1f" | format(f['ColorPts'] | float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <hr>
+        <h3 class="card-header-custom mb-3 pl-3 stats-box">BOIL</h3>
+        <div class="row mb-3">
+            <div class="col-12">
+                <p class="mb-1 text-muted ml-1"><b>Total Boil Time (m):</b> {{ '#TODO' }}</p>
+                <p class="mb-1 text-muted ml-1"><b>Pre-hop Boil Time (m):</b> {{ '#TODO' }}</p>
+                <p class="mb-1 text-muted ml-1"><b>First Wort Hopping:</b> {{ ('Enabled') if (recipe['IsFirstWort'] == 'True') else ('Disabled') }}</p>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-10">
+                <p class="small text-muted text-center">Boil Steps</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Location</th>
+                            <th>Temp (°F)</th>
+                            <th>Boil Time (m)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in recipe['BoilSteps'] %}
+                        <tr>
+                            <td>{{ s['Location'] }}</td>
+                            <td>{{ s['Temp'] }}</td>
+                            <td>{{ s['Time'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <hr/>
+                <p class="small text-muted text-center">Hops</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Amount (oz)</th>
+                            <th>AA%</th>
+                            <th>Time (m)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in recipe['Hops'] %}
+                        <tr>
+                            <td>{{ h['Name'] }}</td>
+                            <td>{{ h['Amount'] }}</td>
+                            <td>{{ "%.1f" | format(h['Alpha'] | float) }}</td>
+                            <td>{{ "%.0f" | format(h['Time'] | float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <hr/>
+                <p class="small text-muted text-center">Other Boil Ingredients</p>
+                #TODO: This
+            </div>
+        </div>
+        <hr>
+        {% if recipe['WhirlpoolSteps']|length > 0 %}
+        <h3 class="card-header-custom mb-3 pl-3 stats-box">WHIRLPOOL</h3>
+        <div class="row mb-3">
+            <div class="col-12">
+                <p class="mb-1 text-muted ml-1"><b>Whirlpool Time (m):</b> {{ '#TODO' }}</p>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-10">
+                <p class="small text-muted text-center">Whirlpool Steps</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Location</th>
+                            <th>Temp (°F)</th>
+                            <th>Whirlpool Time (m)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in recipe['WhirlpoolSteps'] %}
+                        <tr>
+                            <td>{{ h['Location'] }}</td>
+                            <td>{{ h['Temp'] }}</td>
+                            <td>{{ h['Time'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <hr/>
+                <p class="small text-muted text-center">Hops</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Amount (oz)</th>
+                            <th>AA%</th>
+                            <th>Time (m)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in recipe['WhirlpoolHops'] %}
+                        <tr>
+                            <td>{{ h['Name'] }}</td>
+                            <td>{{ h['Amount'] }}</td>
+                            <td>{{ "%.1f" | format(h['Alpha'] | float) }}</td>
+                            <td>{{ "%.0f" | format(h['Time'] | float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <hr/>
+                <p class="small text-muted text-center">Other Whirlpool Ingredients</p>
+                #TODO: This
+            </div>
+        </div>
+        <hr>
+        {% endif %}
+        <h3 class="card-header-custom mb-3 pl-3 stats-box">FERMENTATION</h3>
+        <div class="row mb-3">
+            <div class="col-12">
+                <p class="mb-1 text-muted ml-1"><b>Fermentation Type:</b> {{ '#TODO' }}</p>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-10">
+                <p class="small text-muted text-center">Yeast</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Expected AA%</th>
+                            <th>Range Temp (°F)</th>
+                            <th>Pitch Temp (°F)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>{{ recipe['Yeast']['Name'] }}</td>
+                            <td>{{ recipe['Yeast']['ExpectedAtten'] }}</td>
+                            <td>{{ recipe['Yeast']['MinTemp'] }} - {{ recipe['Yeast']['MaxTemp'] }}</td>
+                            <td>{{ recipe['Yeast']['ExpectedTemp'] }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <hr/>
+                <p class="small text-muted text-center">Fermentation Steps</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Step</th>
+                            <th>Temp (°F)</th>
+                            <th>Days</th>
+                            <th>Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in recipe['FermentationSteps'] %}
+                        <tr>
+                            <td>{{ s['Name'] }}</td>
+                            <td>{{ s['Temp'] }}</td>
+                            <td>{{ "%.1f" | format(s['Days'] | float) }}</td>
+                            <td>{{ "%.1f" | format(s['Hours'] | float) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <hr/>
+                <p class="small text-muted text-center">Dry Hops</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Amount (oz)</th>
+                            <th>AA%</th>
+                            <th>Time (m)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for h in recipe['DryHops'] %}
+                        <tr>
+                            <td>{{ h['Name'] }}</td>
+                            <td>{{ h['Amount'] }}</td>
+                            <td>{{ "%.1f" | format(h['Alpha'] | float) }}</td>
+                            <td>{{ ("%.0f" | format(h['Time'] | float)) if (h['Time'] > 0) else ('N/A') }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <hr/>
+                <p class="small text-muted text-center">Fermentation Additions</p>
+                #TODO: This
+            </div>
+        </div>
+        <hr>
+        <h3 class="card-header-custom mb-3 pl-3 stats-box">BREWING STEPS</h3>
+        <div class="row justify-content-center">
+            <div class="col-10">
+                <p class="small text-muted text-center">Brewing Instructions:</p>
+                <ol>
+                    {% if recipe['HumanBrewingSteps']['FillKeg'] != "" %}
+                    <li>{{ recipe['HumanBrewingSteps']['FillKeg'] }}</li>
+                    {% endif %}
+                    {% if recipe['HumanBrewingSteps']['LoadMash'] != "" %}
+                    <li>
+                        {{ recipe['HumanBrewingSteps']['LoadMash'] }}
+                        <ul>
+                        {% for m in recipe['HumanBrewingSteps']['Mash'] %}
+                            <li>{{ m['Amount'] }} {{ m['Units'] }} of {{ m['Name'] }}</li>
+                        {% endfor %}
+                        </ul>
+                    </li>
+                    {% endif %}
+                    {% if recipe['HumanBrewingSteps']['AdjunctRounds']|length > 0 %}
+                    {% for r in recipe['HumanBrewingSteps']['AdjunctRounds'] %}
+                    <li>
+                        {{ recipe['HumanBrewingSteps']['LoadAdjuncts'] }}
+                        <ol>
+                            {% if r['Adjuncts1']|length > 0 %}
+                            <li>
+                                Load the following ingredients in Adjunct 1
+                                <ul>
+                                    {% for i in r['Adjuncts1'] %}
+                                    <li>{{ i['Amount'] }} {{ i['Units'] }} of {{ i['Name'] }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                            {% endif %}
+                            {% if r['Adjuncts2']|length > 0 %}
+                            <li>
+                                Load the following ingredients in Adjunct 2
+                                <ul>
+                                    {% for i in r['Adjuncts2'] %}
+                                    <li>{{ i['Amount'] }} {{ i['Units'] }} of {{ i['Name'] }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                            {% endif %}
+                            {% if r['Adjuncts3']|length > 0 %}
+                            <li>
+                                Load the following ingredients in Adjunct 3
+                                <ul>
+                                    {% for i in r['Adjuncts3'] %}
+                                    <li>{{ i['Amount'] }} {{ i['Units'] }} of {{ i['Name'] }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                            {% endif %}
+                            {% if r['Adjuncts4']|length > 0 %}
+                            <li>
+                                Load the following ingredients in Adjunct 4
+                                <ul>
+                                    {% for i in r['Adjuncts4'] %}
+                                    <li>{{ i['Amount'] }} {{ i['Units'] }} of {{ i['Name'] }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </li>
+                            {% endif %}
+                        </ol>
+                    </li>
+                    {% endfor %}
+                    {% endif %}
+                </ol>
+                <hr/>
+                <p class="small text-muted text-center">Fermentation Instructions:</p>
+                <ol>
+                    <li>Cool to {{ recipe['FermentationSteps'][0]['Temp'] }}°F</li> <!--#TODO: Hardcoded Index: 0-->
+                    <li>Pitch Yeast</li>
+                    {% if recipe['HumanBrewingSteps']['LoadFermentationAdditions'] != "" %}
+                    <li>
+                        {{ recipe['HumanBrewingSteps']['LoadFermentationAdditions'] }}
+                        <ul>
+                        {% for fa in recipe['HumanBrewingSteps']['FermentationAdditions'] %}
+                            <li>{{ fa['Amount'] }} {{ fa['Units'] }} of {{ fa['Name'] }}</li>
+                        {% endfor %}
+                        </ul>
+                    </li>
+                    {% endif %}
+                    <li>Keep temperature consistent for {{ "%.1f" | format(recipe['FermentationSteps'][0]['Days'] | float) }} Days</li> <!--#TODO: Hardcoded Index: 0-->
+                </ol>
+                <hr/>
+                <p class="small text-muted text-center">Special Brewing Instructions:</p>
+                {% if recipe['SpecialBrewingInstructions'] != "" %}
+                {{ recipe['SpecialBrewingInstructions'] }}
+                {% endif %}
+                <hr/>
+                <p class="small text-muted text-center">Machine Steps:</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Location</th>
+                            <th>Temp (°F)</th>
+                            <th>Time (m)</th>
+                            <th>Drain (m)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in recipe['MachineSteps'] %}
+                        <tr>
+                            <td>{{ s['Name'] }}</td>
+                            <td>{{ s['StepLocation'] }}</td>
+                            <td>{{ s['Temperature'] }}</td>
+                            <td>{{ s['Time'] }}</td>
+                            <td>{{ s['Drain'] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script> -->
+    <input type="hidden"  id="grainData" value="{{ grainData }}">
+    <script>
+        // Register the datalabels plugin globally
+        Chart.register(ChartDataLabels);
+        
+        // Pass Python list for labels into a JavaScript array
+        const grainLabels = {{ grain_data.labels | tojson | safe }};
+        const grainValues = {{ grain_data.data | tojson | safe }};
+        
+        // --- Grain Bill Chart (Doughnut) ---
+        const grainData = {
+            labels: grainLabels, //['American Two-Row Pale', 'Belgian Candipls'],
+            datasets: [{
+                data: grainValues, // Approximate visual proportions from the image
+                // backgroundColor: ['#FFB347', '#6a5acd'],
+                // hoverBackgroundColor: ['#FFB347', '#6a5acd'],
+                borderWidth: 0
+            }]
+        };
+
+        const grainConfig = {
+            type: 'doughnut',
+            data: grainData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        display: false // Hide the standard legend
+                    },
+                    tooltip: {
+                        enabled: true
+                    },
+                    datalabels: { // Use datalabels to mimic the center text if needed, but keeping it simple
+                        display: false 
+                    }
+                }
+            }
+        };
+
+        new Chart(
+            document.getElementById('grainBillChart'),
+            grainConfig
+        );
+
+        // Pass Python list for labels into a JavaScript array
+        const hopsLabels = {{ hops_data.labels | tojson | safe }};
+        const hopsValues = {{ hops_data.data | tojson | safe }};
+
+        // --- Hop Bill Chart (Doughnut) ---
+        const hopData = {
+            labels: hopsLabels,
+            datasets: [{
+                // Approximate visual proportions from the image
+                data: hopsValues, 
+                // backgroundColor: ['#008000', '#7CFC00', '#3CB371', '#228B22'],
+                // hoverBackgroundColor: ['#008000', '#7CFC00', '#3CB371', '#228B22'],
+                borderWidth: 0
+            }]
+        };
+
+        const hopConfig = {
+            type: 'doughnut',
+            data: hopData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        enabled: true
+                    }
+                }
+            }
+        };
+
+        new Chart(
+            document.getElementById('hopBillChart'),
+            hopConfig
+        );
+
+        const wortCurveData = {{ wortCurveData | tojson | safe }};
+        
+        // --- Wort Curve Chart (Line) ---
+        const wortData = {
+            labels: Array.from({length: wortCurveData.length}, (_, i) => i), // 0 to 240 min
+            datasets: [{
+                label: 'Temperature',
+                data: wortCurveData,
+                // data: [
+                //     40, 40, 150, 150, 150, 150, // Mash (approx. 150°F)
+                //     212, 212, 212, 212, 212, 212, // Boil (approx. 212°F)
+                //     80 // Chill
+                // ],
+                borderColor: 'rgb(255, 165, 0)', // Orange line
+                backgroundColor: 'rgba(255, 165, 0, 0.1)',
+                fill: false,
+                tension: 0, // Straight lines
+                pointRadius: 0 // Hide points
+            }]
+        };
+
+        const wortConfig = {
+            type: 'line',
+            data: wortData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 250,
+                        title: {
+                            display: true,
+                            text: 'Temp (°F)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time (min)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        enabled: true
+                    },
+                    datalabels: {
+                        display: false
+                    }
+                }
+            }
+        };
+
+        new Chart(
+            document.getElementById('wortCurveChart'),
+            wortConfig
+        );
+
+    </script>
+{% endwith %}
+{% endblock %}

@@ -1,0 +1,90 @@
+<script src='/static/js/showdown/showdown.min.js'></script>
+<script>
+  const classMap = {
+    table: 'table table-dark table-striped table-bordered'
+  }
+  const bindings = Object.keys(classMap)
+    .map(key => ({
+      type: 'output',
+      regex: new RegExp(`<${key}(.*)>`, 'g'),
+      replace: `<${key} class="${classMap[key]}" $1>`
+  }));
+  const options = {
+    'tables': true, 
+    'simpleLineBreaks': true,
+    'extensions': [...bindings]
+  };
+  const converter = new showdown.Converter(options);
+
+  function getMarkdown(text, outDiv) {
+    target = document.getElementById(outDiv);
+    html = converter.makeHtml(text);
+    target.innerHTML = html;
+  }
+</script>
+<div id="accordion">
+    {% for recipe in recipes %}
+    <div class="container mb-1">
+      <div class="card p-3">
+        <div class="row align-items-center">
+          <div class="col-1">
+            <img src="/static/img/SRM/srm_{{'%.0f' | format(recipe['SRM'] | float)}}.png" width="100%"/>
+          </div>
+          <div class="col-6">
+              <h3 class="mb-0">{{recipe['name']}}</h3>
+              <small class="text-muted">CREATED BY: <strong>{{recipe['author']}}</strong></small>
+          </div>  
+          <div class="col-2 text-start border-start px-3">
+              <div class="small d-block text-muted">Brewed: <b>1 time</b></div>
+              <div class="small d-block text-muted">Last Brewed:</div>
+              <div class="small d-block text-muted mb-2"><b>Mon Feb 05 2018</b></div>
+              <button class="btn btn-sm btn-outline-secondary me-1">
+                <i class="fas fa-eye"></i>
+              </button>
+              <a href="{{ url_for('main._recipe', rfid=recipe['id']) }}">
+              <button class="btn btn-sm btn-success">
+                <i class="fas fa-pencil"></i>
+              </button>
+              </a>
+              <button class="btn btn-sm btn-info">
+                <i class="fas fa-copy"></i>
+              </button>
+              <button class="btn btn-sm btn-danger">
+                <i class="fas fa-trash"></i>
+              </button>
+          </div>
+          <div class="col-3">
+            <div class="row align-items-center">
+              <div class="col-12 d-flex justify-content-end align-items-center mb-2">
+                  <span class="fw-bold text-nowrap">{{ recipe['StyleNameCode'] }}</span>
+              </div>
+              <div class="col-12 d-flex justify-content-end">
+                <table class="table table-sm table-borderless text-center mb-0" style="width: auto;">
+                  <thead>
+                      <tr class="text-uppercase small text-muted">
+                          <th>OG</th>
+                          <th>FG</th>
+                          <th>IBU</th>
+                          <th>SRM</th>
+                          <th>ABV</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr>
+                          <td><strong>{{"%.3f" | format(recipe['OG'] | float)}}</strong></td>
+                          <td><strong>{{"%.3f" | format(recipe['FG'] | float)}}</strong></td>
+                          <td><strong>{{recipe['ibu']}}</strong></td>
+                          <td><strong>{{recipe['SRM']}}</strong> <span class="p-1 rounded d-inline-block" style="background-color: rgb(181, 76, 0);"><i class="bi bi-check-lg text-white"></i></span></td>
+                          <td><strong>{{"%.1f" | format(recipe['abv'] | float)}}%</strong></td>
+                      </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+</div>
