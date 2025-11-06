@@ -6,7 +6,7 @@
 <script src="/static/js/base_recipe.js"></script>
 <script src="/static/js/pico_recipe.js"></script>
 <script>var tables = {};</script>
-{% include "units_selector.html" %}
+<!-- {% include "units_selector.html" %} -->
 {% with recipe_type='pico' %}
     <div class="container recipe-container">
         <div class="row">
@@ -80,7 +80,7 @@
                         <ul class="list-unstyled small mt-3 text-center">
                             {% for f in recipe['Hops']|sort(attribute='Amount',reverse=true) %}
                             <li class="d-flex justify-content-between">
-                                <div>{{ f['Name'] }} (Location: {{ f['Location'] }})</div>
+                                <div>{{ f['Name'] }} <a class="small text-muted" style="text-decoration:none">in {{ f['Location'] }}</a></div>
                                 <div>{{ f['Amount'] }}</div>
                             </li>
                             {% endfor %}
@@ -95,8 +95,8 @@
                         <div style="height: 200px; margin-bottom: 10px;">
                             <canvas id="wortCurveChart"></canvas>
                         </div>
-                        <p class="small mb-0 text-muted">Brew Time (Est.): **4 hrs and 19 mins**</p>
-                        <p class="small mb-0 text-muted">Chill Time (Est.): **2 hrs and 15 mins**</p>
+                        <p class="small mb-0 text-muted">Brew Time (Est.): **4 hrs and 19 mins** #TODO: FIX</p>
+                        <p class="small mb-0 text-muted">Chill Time (Est.): **2 hrs and 15 mins**#TODO: FIX</p>
                     </div>
                 </div>
             </div>

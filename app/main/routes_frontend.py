@@ -23,7 +23,7 @@ from .session_parser import (_paginate_sessions, list_session_files,
                              get_brew_graph_data, get_ferm_graph_data, get_still_graph_data, get_iSpindel_graph_data, get_tilt_graph_data,
                              active_brew_sessions, active_ferm_sessions, active_still_sessions, active_iSpindel_sessions, active_tilt_sessions,
                              add_invalid_session, get_invalid_sessions, load_brew_sessions)
-from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION
+from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION, SRM_COLOR_DATA
 
 file_glob_pattern = "[!._]*.json"
 yaml = YAML()
@@ -489,7 +489,7 @@ def _recipes():
     global redux_recipes, invalid_recipes
     redux_recipes = load_redux_recipes()
     recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
-    return render_template_with_defaults('redux_recipes.html', recipes=recipes_dict, invalid=invalid_recipes.get(MachineType.ZSERIES, set()))
+    return render_template_with_defaults('redux_recipes.html', recipes=recipes_dict, invalid=invalid_recipes.get(MachineType.ZSERIES, set()), SRM_COLOR_DATA=SRM_COLOR_DATA)
 
 #   Recipe: /API/pico/getRecipe?rfid={rfid}
 # Response: HTML
@@ -520,6 +520,10 @@ def _recipe(args):
     for s in recipe['MachineSteps']:
         for m in range(s['Time']):
             wortCurveData.append(int(s['Temperature']))
+    for s in range(len(recipe['Hops'])):
+        for k in ZSERIES_LOCATION.keys():
+            if ZSERIES_LOCATION[k] == str(recipe['Hops'][s]['Location']):
+                recipe['Hops'][s]['Location'] = k.replace("Adjunct", "Adjunct ")
     for s in range(len(recipe['BoilSteps'])):
         for k in ZSERIES_LOCATION.keys():
             if ZSERIES_LOCATION[k] == str(recipe['BoilSteps'][s]['Location']):

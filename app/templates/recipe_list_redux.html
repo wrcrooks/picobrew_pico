@@ -28,7 +28,7 @@
       <div class="card p-3">
         <div class="row align-items-center">
           <div class="col-1">
-            <img src="/static/img/SRM/srm_{{'%.0f' | format(recipe['SRM'] | float)}}.png" width="100%"/>
+            <img src="/static/img/SRM/srm_{{ (recipe['SRM'] | round | int) if recipe['SRM'] < 61 else 60 }}.png" width="100%"/>
           </div>
           <div class="col-6">
               <h3 class="mb-0">{{recipe['name']}}</h3>
@@ -74,7 +74,7 @@
                           <td><strong>{{"%.3f" | format(recipe['OG'] | float)}}</strong></td>
                           <td><strong>{{"%.3f" | format(recipe['FG'] | float)}}</strong></td>
                           <td><strong>{{recipe['ibu']}}</strong></td>
-                          <td><strong>{{recipe['SRM']}}</strong> <span class="p-1 rounded d-inline-block" style="background-color: rgb(181, 76, 0);"><i class="bi bi-check-lg text-white"></i></span></td>
+                          <td><strong>{{recipe['SRM']}}</strong> <span title="{{ SRM_COLOR_DATA[recipe['SRM']|round|int]['Name'] }}" class="p-1 rounded d-inline-block" style="background-color: {{ SRM_COLOR_DATA[recipe['SRM']|round|int]['HEX'] }};"><i class="bi bi-check-lg text-white"></i></span></td> 
                           <td><strong>{{"%.1f" | format(recipe['abv'] | float)}}%</strong></td>
                       </tr>
                   </tbody>

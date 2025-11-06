@@ -44,6 +44,44 @@ PICO_SESSION = {
     5: 'Manual Brew',
 }
 
+SRM_COLOR_DATA = {
+    1: {'Name': 'Pale Transparent', 'HEX': '#F7E1A1'},
+    2: {'Name': 'Pale Straw', 'HEX': '#F0C566'},
+    3: {'Name': 'Straw', 'HEX': '#E9AD3F'},
+    4: {'Name': 'Pale Gold', 'HEX': '#E19726'},
+    5: {'Name': 'Golden', 'HEX': '#D98416'},
+    6: {'Name': 'Deep Gold / Dark Goldenrod', 'HEX': '#D1730C'},
+    7: {'Name': 'Light Amber', 'HEX': '#C86505'},
+    8: {'Name': 'Amber', 'HEX': '#C05801'},
+    9: {'Name': 'Medium Amber', 'HEX': '#B74D00'},
+    10: {'Name': 'Copper / Orange', 'HEX': '#AF4300'},
+    11: {'Name': 'Deep Copper', 'HEX': '#A73B00'},
+    12: {'Name': 'Deep Amber / Ruby', 'HEX': '#9F3400'},
+    13: {'Name': 'Dark Ruby', 'HEX': '#972D00'},
+    14: {'Name': 'Reddish Brown', 'HEX': '#8F2800'},
+    15: {'Name': 'Mahogany / Deep Red', 'HEX': '#882300'},
+    16: {'Name': 'Maroon', 'HEX': '#811F00'},
+    17: {'Name': 'Dark Brown / Pueblo', 'HEX': '#7B1B00'},
+    18: {'Name': 'Brown', 'HEX': '#741800'},
+    19: {'Name': 'Deep Brown / Barn Red', 'HEX': '#6E1500'},
+    20: {'Name': 'Rosewood / Very Dark Brown', 'HEX': '#681200'},
+    21: {'Name': 'Black Brown', 'HEX': '#631000'},
+    22: {'Name': 'Red Oxide', 'HEX': '#5E0E00'},
+    23: {'Name': 'Rustic Red', 'HEX': '#590C00'},
+    24: {'Name': 'Burnt Maroon', 'HEX': '#540B00'},
+    25: {'Name': 'Pheasant Red', 'HEX': '#500900'},
+    26: {'Name': 'Brown Pod', 'HEX': '#4C0800'},
+    27: {'Name': 'Temptress', 'HEX': '#480700'},
+    28: {'Name': 'Very Dark Red', 'HEX': '#450600'},
+    29: {'Name': 'Near Black', 'HEX': '#420500'},
+    30: {'Name': 'Black (Ruby highlights)', 'HEX': '#3F0500'},
+    35: {'Name': 'Black', 'HEX': '#310400'},
+    40: {'Name': 'Black (Opaque)', 'HEX': '#260300'},
+    45: {'Name': 'Opaque Black', 'HEX': '#1C0200'},
+    50: {'Name': 'Pitch Black', 'HEX': '#120100'},
+    55: {'Name': 'Very Deep Black', 'HEX': '#090100'},
+    60: {'Name': 'Stygian/Deepest Black', 'HEX': '#000000'}
+}
 
 class PicoBrewSession:
     def __init__(self, machineType=None):
