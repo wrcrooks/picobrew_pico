@@ -538,6 +538,19 @@ def _recipe(args):
                 recipe['MachineSteps'][s]['StepLocation'] = k.replace("Adjunct", "Adjunct ").replace("PassThru", "Pass Through")
     return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData)
 
+@main.route('/ingredients')
+def _ingredients():
+    global redux_recipes, invalid_recipes
+    redux_recipes = load_redux_recipes()
+    recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
+    return render_template_with_defaults('redux_recipes.html', recipes=recipes_dict, invalid=invalid_recipes.get(MachineType.ZSERIES, set()), SRM_COLOR_DATA=SRM_COLOR_DATA)
+
+#   Recipe: /API/pico/getRecipe?rfid={rfid}
+# Response: HTML
+get_recipe_args = {
+    'rfid': fields.Str(required=True)      # 14 character alpha-numeric PicoPak RFID
+}
+
 
 @main.route('/pico_recipes')
 def _pico_recipes():
