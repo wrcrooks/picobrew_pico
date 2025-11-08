@@ -179,7 +179,7 @@ docker run -d -it -p 80:80 --name picobrew_pico \
 --mount type=bind,source=<Host Docker Data Directory>/picobrew/app/firmware,target=/picobrew_pico/app/firmware \
 --mount type=bind,source=<Host Docker Data Directory>/picobrew/config.yaml,target=/picobrew_pico/config.yaml \
 -e MQTT_BROKER_HOST="192.168.1.100" -e MQTT_PORT="1883" -e MQTT_TOPIC_PREFIX="pico" -e MQTT_USER="mqtt" -e MQTT_PASS="supersecretpassword" -e HOMEASSISTANT="True" \
-wrcrooks/picobrew_pico
+wrcrooks/picobrew_pico:latest
 ```
 
 ###### Option 1: Docker Compose (with SSL support via a dedicated nginx container)
@@ -248,7 +248,15 @@ Clone this repo, then run
 ## Disclaimer
 Except as represented in this agreement, all work product by Developer is provided ​“AS IS”. Other than as provided in this agreement, Developer makes no other warranties, express or implied, and hereby disclaims all implied warranties, including any warranty of merchantability and warranty of fitness for a particular purpose.
 
-# Debugging
+## Debugging
 1. `docker ps` and grab the "CONTAINER ID" from the "picobrew_pico" container
 2. `docker logs -f <CONTAINER ID>`
 
+## Running Development Builds (Not Recommended)
+There is a development image that gets very little unit testing: `wrcrooks/picobrew_pico:dev`
+It's almost guaranteed that some features may be broken in this Docker image. You have been warned
+
+# Hardware
+## Pico C/S/Pro
+* [DIY Step Filter Tray](https://www.ebay.com/itm/146917265375)
+* [3D Printed Front Drain Grille](https://www.printables.com/model/1473610-picobrew-drain-grille)
