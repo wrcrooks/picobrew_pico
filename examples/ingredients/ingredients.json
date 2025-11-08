@@ -1,0 +1,71 @@
+{
+    "Fermentables": [
+        {
+            "Name": "American Two-Row Pale",
+            "Supplier": "Rahr",
+            "Origin": "America",
+            "Color": 1.8,
+            "Yield": 36.8,
+            "PPG": 36.8,
+            "FermentableType": "Grain"
+        },
+        {
+            "Name": "American Crystal 20L",
+            "Supplier": "",
+            "Origin": "America",
+            "Color": 20.0,
+            "Yield": 35.0,
+            "FermentableType": "Grain"
+        },
+        {
+            "Name": "Corn Sugar (Dextrose)",
+            "Supplier": "",
+            "Origin": "",
+            "Color": 0.0,
+            "Yield": 45.65,
+            "FermentableType": "Sugar"
+        }
+    ],
+    "Hops": [
+        {
+            "Name": "Magnum",
+            "Supplier": "",
+            "Origin": "America",
+            "Alpha": 13.5
+        },
+        {
+            "Name": "Galaxy",
+            "Supplier": "",
+            "Alpha": 13.5
+        },
+        {
+            "Name": "Cascade",
+            "Supplier": "",
+            "Alpha": 6.2
+        },
+        {
+            "Name": "Amarillo",
+            "Supplier": "",
+            "Alpha": 7.0
+        }
+    ],
+    "Yeast": [
+        {
+            "Name": "SafAle",
+            "Laboratory": "Fermentis",
+            "ProductID": "US-05",
+            "MinAtten": 78.0,
+            "MaxAtten": 82.0,
+            "MinTemp": 64.0,
+            "MaxTemp": 82.0,
+            "ExpectedAtten": 86.0,
+            "ExpectedTemp": 65.0
+        }
+    ],
+    "WaterAmendments": [
+        {
+            "Name": "Calcium Chloride",
+            "Description": null
+        }
+    ]
+}
