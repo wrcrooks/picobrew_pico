@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% block content %}
+<script src="/static/js/server_management.js"></script>
+<script src="/static/js/convert_units.js"></script>
+<script src="/static/js/pico_image.js"></script>
+<script src="/static/js/base_recipe.js"></script>
+<script src="/static/js/pico_recipe.js"></script>
+<script>var tables = {};</script>
+<!-- {% include "units_selector.html" %} -->
+{% include "ingredient_actions.html" %}
+{% include "invalid_file.html" %}
+<!-- <br /><br /><br /> -->
+<script src='/static/js/showdown/showdown.min.js'></script>
+<script>
+  const classMap = {
+    table: 'table table-dark table-striped table-bordered'
+  }
+  const bindings = Object.keys(classMap)
+    .map(key => ({
+      type: 'output',
+      regex: new RegExp(`<${key}(.*)>`, 'g'),
+      replace: `<${key} class="${classMap[key]}" $1>`
+  }));
+  const options = {
+    'tables': true, 
+    'simpleLineBreaks': true,
+    'extensions': [...bindings]
+  };
+  const converter = new showdown.Converter(options);
+
+  function getMarkdown(text, outDiv) {
+    target = document.getElementById(outDiv);
+    html = converter.makeHtml(text);
+    target.innerHTML = html;
+  }
+</script>
+<div id="accordion">
+    <div class="ml-3 mb-2 text-white" style="font-size: 1.75rem">Fermentables</div>
+    {% for fermentable in ingredients['Fermentables'] %}
+    <div class="container mb-1">
+      <div class="card p-3">
+        <div class="row align-items-center">
+          <div class="col-1">
+            <img src="" width="100%"/>
+          </div>
+          <div class="col-6">
+              <h3 class="mb-0">{{ fermentable['Name'] }}</h3>
+          </div>  
+          <div class="col-3">
+            <div class="row align-items-center">
+              <div class="col-12 d-flex justify-content-end align-items-center mb-2">
+                  <span class="fw-bold text-nowrap"></span>
+              </div>
+              <div class="col-12 d-flex justify-content-start">
+                <table class="table table-sm table-borderless text-center mb-0" style="width: auto;">
+                  <thead>
+                      <tr class="text-uppercase small text-muted">
+                          <th>Color</th>
+                          <th>PPG</th>
+                          <th>Type</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr>
+                          <td><strong>{{ fermentable['Color'] }}</strong> <span title="{{ fermentable['ColorCategory'] }}" class="p-1 rounded d-inline-block" style="background-color: {{ fermentable['ColorHEX'] }};"><i class="bi bi-check-lg text-white"></i></span></td>
+                          <td><strong>{{ fermentable['Yield'] }}</strong></td>
+                          <td><strong>{{ fermentable['FermentableType'] }}</strong></td>
+                      </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-2 text-start border-start d-flex justify-content-end">
+            <div class="px-3">
+              <button class="btn btn-sm btn-success">
+                <i class="fas fa-pencil"></i>
+              </button>
+              </a>
+              <button class="btn btn-sm btn-info">
+                <i class="fas fa-copy"></i>
+              </button>
+              <button class="btn btn-sm btn-danger">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="ml-3 mb-2 text-white" style="font-size: 1.75rem">Hops</div>
+    {% for hops in ingredients['Hops'] %}
+    <div class="container mb-1">
+      <div class="card p-3">
+        <div class="row align-items-center">
+          <div class="col-1">
+            <img src="" width="100%"/>
+          </div>
+          <div class="col-6">
+              <h3 class="mb-0">{{ hops['Name'] }}</h3>
+          </div>  
+          <div class="col-3">
+            <div class="row align-items-center">
+              <div class="col-12 d-flex justify-content-end align-items-center mb-2">
+                  <span class="fw-bold text-nowrap"></span>
+              </div>
+              <div class="col-12 d-flex justify-content-start">
+                <table class="table table-sm table-borderless text-center mb-0" style="width: auto;">
+                  <thead>
+                      <tr class="text-uppercase small text-muted">
+                          <th>Alpha</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr>
+                          <td><strong>{{ hops['Alpha'] }}</strong></td>
+                      </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-2 text-start border-start d-flex justify-content-end">
+            <div class="px-3">
+              <button class="btn btn-sm btn-success">
+                <i class="fas fa-pencil"></i>
+              </button>
+              </a>
+              <button class="btn btn-sm btn-info">
+                <i class="fas fa-copy"></i>
+              </button>
+              <button class="btn btn-sm btn-danger">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="ml-3 mb-2 text-white" style="font-size: 1.75rem">Yeasts</div>
+    {% for yeast in ingredients['Yeast'] %}
+    <div class="container mb-1">
+      <div class="card p-3">
+        <div class="row align-items-center">
+          <div class="col-1">
+            <img src="" width="100%"/>
+          </div>
+          <div class="col-6">
+              <h3 class="mb-0">{{ yeast['Name'] }}</h3>
+              <small class="text-muted"><strong>{{ yeast['Laboratory'] }}</strong> {{ yeast['ProductID'] }}</small>
+          </div>  
+          <div class="col-3">
+            <div class="row align-items-center">
+              <div class="col-12 d-flex justify-content-end align-items-center mb-2">
+                  <span class="fw-bold text-nowrap"></span>
+              </div>
+              <div class="col-12 d-flex justify-content-start">
+                <table class="table table-sm table-borderless text-center mb-0" style="width: auto;">
+                  <thead>
+                      <tr class="text-uppercase small text-muted">
+                          <th>Min Temp</th>
+                          <th>Max Temp</th>
+                          <th>Expected Temp</th>
+                      </tr>
+                  </thead>
+                  <tbody>
+                      <tr>
+                          <td><strong>{{ yeast['MinTemp'] }}</strong></td>
+                          <td><strong>{{ yeast['MaxTemp'] }}</strong></td>
+                          <td><strong>{{ yeast['ExpectedTemp'] }}</strong></td>
+                      </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="col-2 text-start border-start d-flex justify-content-end">
+            <div class="px-3">
+              <button class="btn btn-sm btn-success">
+                <i class="fas fa-pencil"></i>
+              </button>
+              </a>
+              <button class="btn btn-sm btn-info">
+                <i class="fas fa-copy"></i>
+              </button>
+              <button class="btn btn-sm btn-danger">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="ml-3 mb-2 text-white" style="font-size: 1.75rem">Water Amendments</div>
+    {% for amendment in ingredients['WaterAmendments'] %}
+    <div class="container mb-1">
+      <div class="card p-3">
+        <div class="row align-items-center">
+          <div class="col-1">
+            <img src="" width="100%"/>
+          </div>
+          <div class="col-6">
+              <h3 class="mb-0">{{ amendment['Name'] }}</h3>
+          </div>  
+          <div class="col-3">
+            <div class="row align-items-center">
+              <div class="col-12 d-flex justify-content-end align-items-center mb-2">
+                  <span class="fw-bold text-nowrap"></span>
+              </div>
+              <div class="col-12 d-flex justify-content-start">
+                {{ amendment['Description'] }}
+              </div>
+            </div>
+          </div>
+          <div class="col-2 text-start border-start d-flex justify-content-end">
+            <div class="px-3">
+              <button class="btn btn-sm btn-success">
+                <i class="fas fa-pencil"></i>
+              </button>
+              </a>
+              <button class="btn btn-sm btn-info">
+                <i class="fas fa-copy"></i>
+              </button>
+              <button class="btn btn-sm btn-danger">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+</div>
+{% endblock %}

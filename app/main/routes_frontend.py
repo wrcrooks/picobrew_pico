@@ -23,7 +23,7 @@ from .session_parser import (_paginate_sessions, list_session_files,
                              get_brew_graph_data, get_ferm_graph_data, get_still_graph_data, get_iSpindel_graph_data, get_tilt_graph_data,
                              active_brew_sessions, active_ferm_sessions, active_still_sessions, active_iSpindel_sessions, active_tilt_sessions,
                              add_invalid_session, get_invalid_sessions, load_brew_sessions)
-from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION, SRM_COLOR_DATA
+from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION, SRM_COLOR_DATA, LOVIBOND_COLOR_DATA
 
 file_glob_pattern = "[!._]*.json"
 yaml = YAML()
@@ -419,6 +419,18 @@ def load_zseries_recipe(file):
     return recipe
 
 
+def load_ingredients():
+    filepath = current_app.config['RECIPES_PATH']
+    filepath = filepath.joinpath('ingredients/ingredients.json')
+    try:
+        ingredients = None
+        with open(filepath) as f:
+            ingredients = json.load(f)
+            return ingredients
+    except Exception as e:
+        current_app.logger.error("ERROR: An exception occurred parsing ingredients {}".format(file))
+        current_app.logger.error(e)
+
 def parse_recipe(machineType, recipe, file):
     try:
         recipe.parse(file)
@@ -540,10 +552,16 @@ def _recipe(args):
 
 @main.route('/ingredients')
 def _ingredients():
-    global redux_recipes, invalid_recipes
-    redux_recipes = load_redux_recipes()
-    recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
-    return render_template_with_defaults('redux_recipes.html', recipes=recipes_dict, invalid=invalid_recipes.get(MachineType.ZSERIES, set()), SRM_COLOR_DATA=SRM_COLOR_DATA)
+    global ingredients
+    ingredients = load_ingredients()
+    for f in ingredients['Fermentables']:
+        # LOVIBOND_COLOR_DATA
+        for c in LOVIBOND_COLOR_DATA:
+            if float(f['Color']) >= c['Lower'] and float(f['Color']) < c['Upper']:
+                f['ColorHEX'] = c['HEX']
+                f['ColorCategory'] = c['Category']
+    # recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
+    return render_template_with_defaults('ingredients.html', ingredients=ingredients)
 
 #   Recipe: /API/pico/getRecipe?rfid={rfid}
 # Response: HTML

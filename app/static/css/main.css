@@ -2,6 +2,10 @@
   margin-bottom: 25px;
   text-align: right;
 }
+#options, #ingredient_actions{
+  margin-bottom: 25px;
+  text-align: right;
+}
 .card-header > a {
   display: block;
   position: relative;

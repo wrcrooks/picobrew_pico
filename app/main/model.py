@@ -83,6 +83,63 @@ SRM_COLOR_DATA = {
     60: {'Name': 'Stygian/Deepest Black', 'HEX': '#000000'}
 }
 
+LOVIBOND_COLOR_DATA = [
+    {
+        "Category": "Colorless",
+        "Lower": 0,
+        "Upper": 0.9,
+        "HEX": "#EEEEEE"
+    },
+    {
+        "Category": "Pilsner/Lager Malts",
+        "Lower": 1,
+        "Upper": 2.4,
+        "HEX": "#F0C566"
+    },
+    {
+        "Category": "Base Malts (Pale Ale, 2-Row)",
+        "Lower": 2.5,
+        "Upper": 4.9,
+        "HEX": "#E19726"
+    },
+    {
+        "Category": "Kilned/Aromatic Malts (Munich)",
+        "Lower": 5,
+        "Upper": 24.9,
+        "HEX": "#AF4300"
+    },
+    {
+        "Category": "Crystal/Caramel (Light)",
+        "Lower": 25,
+        "Upper": 79.9,
+        "HEX": "#5E0B00"
+    },
+    {
+        "Category": "Crystal/Caramel (Dark)",
+        "Lower": 80,
+        "Upper": 199.9,
+        "HEX": "#36080A"
+    },
+    {
+        "Category": "Roasted Malts (Chocolate)",
+        "Lower": 200,
+        "Upper": 499.9,
+        "HEX": "#200405"
+    },
+    {
+        "Category": "Black/Stout Malts",
+        "Lower": 500,
+        "Upper": 649.9,
+        "HEX": "#100203"
+    },
+    {
+        "Category": "Black Malts",
+        "Lower": 650,
+        "Upper": 2000,
+        "HEX": "#000000"
+    }
+]
+
 class PicoBrewSession:
     def __init__(self, machineType=None):
         self.file = None
