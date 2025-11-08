@@ -13,7 +13,7 @@ This is a modified version of chiefwigms' [picobrew_pico](https://github.com/chi
 * Hot Side
   * Pico S: Fully featured ![TESTED](https://img.shields.io/badge/TESTED-green)
   * Pico C: Fully featured ![TESTED](https://img.shields.io/badge/TESTED-green)
-  * Pico Pro: Fully featured
+  * Pico Pro: Fully featured ![TESTED](https://img.shields.io/badge/TESTED-green)
   * Zymatic: Fully featured
   * ZSeries: Fully featured
   * PicoStill: Fully featured
