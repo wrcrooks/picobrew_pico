@@ -455,6 +455,11 @@ class ReduxRecipe():
         self.DryHops = recipe['VM']['Recipe']['DryHops'] or []
         self.HumanBrewingSteps = recipe['VM']['Recipe']['HumanBrewingSteps'] or []
         self.SpecialBrewingInstructions = recipe['VM']['Content']['SpecialBrewingInstructions'] or ""
+        self.StyleNameCode = recipe['VM']['Recipe']['BeerStyle']['StyleNameCode'] or "Custom"
+        try:
+            self.Machine = recipe['Machine'] or "Custom"
+        except Exception:
+            self.Machine = "Pico Z" #TODO: Replace this with "Custom" to signify no machine specification
         # if 'steps' in recipe:
         #     for recipe_step in recipe['steps']:
         #         step = PicoBrewRecipeStep()

@@ -45,6 +45,8 @@
           </div>
           <div class="col-6">
               <h3 class="mb-0">{{ fermentable['Name'] }}</h3>
+              <small class="text-muted"><strong>{{ (fermentable['Supplier']) if (fermentable['Supplier'] and fermentable['Supplier'] != "") else "" }}</strong></small>
+              <div><small>{{ ("Origin: " + fermentable['Origin']) if (fermentable['Origin'] and fermentable['Origin'] != "") else "" }}</small></div>
           </div>  
           <div class="col-3">
             <div class="row align-items-center">
@@ -99,6 +101,8 @@
           </div>
           <div class="col-6">
               <h3 class="mb-0">{{ hops['Name'] }}</h3>
+              <small class="text-muted"><strong>{{ (hops['Supplier']) if (hops['Supplier'] and hops['Supplier'] != "") else "" }}</strong></small>
+              <div><small>{{ ("Origin: " + hops['Origin']) if (hops['Origin'] and hops['Origin'] != "") else "" }}</small></div>
           </div>  
           <div class="col-3">
             <div class="row align-items-center">

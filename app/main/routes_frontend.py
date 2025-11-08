@@ -500,6 +500,10 @@ main.add_app_template_filter(format_datetime_filter, 'format_datetime')
 def _recipes():
     global redux_recipes, invalid_recipes
     redux_recipes = load_redux_recipes()
+    for r in redux_recipes:
+        for s in brew_sessions:
+            print(s['alias'])
+            #TODO: Get recipe brew count and last brew date
     recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
     return render_template_with_defaults('redux_recipes.html', recipes=recipes_dict, invalid=invalid_recipes.get(MachineType.ZSERIES, set()), SRM_COLOR_DATA=SRM_COLOR_DATA)
 
