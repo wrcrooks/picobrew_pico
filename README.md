@@ -29,6 +29,7 @@ This is a modified version of chiefwigms' [picobrew_pico](https://github.com/chi
   * Tilt: Full session graphing
 
 ## Features
+#### Implemented
 * Home Assistant Integration ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-white?logo=homeassistant
 )
 * Device Aliasing
@@ -42,6 +43,10 @@ This is a modified version of chiefwigms' [picobrew_pico](https://github.com/chi
 * Manual Recipe Editing
   * **Note** The table for adding/removing/editing recipe steps has several validation checks in it, but there is always the possibility of ruining your Pico.  
   * *For Pico S/C/Pro Only*: DO NOT EDIT or MOVE Rows 1-3 (Preparing to Brew/Heating/Dough In).  Drain times should all be 0 except for Mash Out (2 minutes) and the last hop addition (5 minutes) (for example, if you only have Hops 1 & 2, set the drain time on Hops 2 to 5, and remove the Hops 3 and 4 rows)
+
+#### Work In Progress
+* PicoBrew inspired "Recipe Builder" (AIO, with support for all devices)
+* Ingredients Library, for use with the aforementioned Recipe Builder
 
 # Installation
 After some consideration, I have decided to only develop with the creation of a Docker image in mind. While I realize this requires some knowledge of containers to use, I ultimately believe this is the easiest way to install and manage for the end user, with platform-agnostic compatibility being a bonus.
