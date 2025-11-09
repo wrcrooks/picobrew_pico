@@ -245,6 +245,25 @@ Clone this repo, then run
 `sudo pip3 install -r requirements.txt` on *nix or `pip3 install -r requirements.txt` as an Administrator in windows  
 `sudo python3 server.py` on *nix or `python3 server.py` as an Administrator in windows (default host interface is `0.0.0.0` and port `80`, but these can be specified via command-line arguments like so `python3 server.py <interface> <port>`)
 
+## Home Assistant
+Home Assistant support relies on having the MQTT itegration working within your HA setup, because this code utilizes the [MQTT Device Discovery](https://www.home-assistant.io/integrations/mqtt/#mqtt-discovery) process.
+#### Setup
+1. Ensure that you have the MQTT integration installed on Home Assistant: [Installation](https://www.home-assistant.io/integrations/mqtt/#configuration)
+2. Set up a new MQTT Broker or use and existing one: [Installation](https://www.home-assistant.io/integrations/mqtt/#setting-up-a-broker)
+3. Write down your MQTT Broker settings
+    * IP Address
+    * Port (Default is 1883)
+    * Broker Username (if any)
+    * Broker Password (if any)
+4. Ensure your Docker image has the following environment variables set
+    * `HOMEASSISTANT: True` *REQUIRED*
+    * `MQTT_BROKER_HOST: <IP From Above>` *REQUIRED*
+    * `MQTT_PORT: <Port From Above>` *Not required; Defaults to 1883*
+    * `MQTT_USER: <Username From Above>` *Not required; Specify only if a username is being used*
+    * `MQTT_PASS: <Password From Above>` *Not required; Specify only if a password is being used*
+  These env variables can be set if using the Docker command with the `-e` flag (See the **"Environment Variables"** section above)
+5. When a new device connects to this PicoBrew server, a discovery message will be sent to Home Assistant via MQTT and show up in the `Settings > Devices & services > MQTT > Devices` page in Home Assistant
+
 ## Disclaimer
 Except as represented in this agreement, all work product by Developer is provided ​“AS IS”. Other than as provided in this agreement, Developer makes no other warranties, express or implied, and hereby disclaims all implied warranties, including any warranty of merchantability and warranty of fitness for a particular purpose.
 
