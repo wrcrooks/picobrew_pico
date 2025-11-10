@@ -184,8 +184,9 @@ def handle_specific_device(uid):
             # delete uid entry from either PicoBrew C config (alternate or normal)
             if mtype in [MachineType.PICOBREW_C, MachineType.PICOBREW_C_ALT]:
                 for type in [MachineType.PICOBREW_C, MachineType.PICOBREW_C_ALT]:
-                    if type in new_server_cfg['aliases'] and uid in new_server_cfg['aliases'][type]:
-                        del new_server_cfg['aliases'][type][uid]
+                    if new_server_cfg['aliases'][type] is not None:
+                        if type in new_server_cfg['aliases'] and uid in new_server_cfg['aliases'][type]:
+                            del new_server_cfg['aliases'][type][uid]
 
             if request.method == 'POST':
                 if mtype not in new_server_cfg['aliases']:
