@@ -8,31 +8,21 @@
 <script>var tables = {};</script>
 <!-- {% include "units_selector.html" %} -->
 {% with recipe_type='pico' %}
-<form method="POST" action="{{ url_for('main._recipe_edit', rfid=recipe['id']) }}" style="display:inline;">
-    <div id="recipe_actions" class="actions">
-        <button type="submit" class="btn btn-sm btn-success">Save</button>
-    </div>
     <div class="container recipe-container">
         <div class="row">
-            <div class="col-md-12">
-                <input type="text" class="form-control form-control-sm mb-3" name="recipe_name" id="recipe_name" placeholder="Name" value="{{ recipe['name'] }}">
-                <!-- <h1 class="mb-2">{{ recipe['name'] }}</h1> -->
-                <textarea type="text" class="form-control form-control-sm" name="recipe_name" id="recipe_name" placeholder="Tasting Notes" rows="4">{{ recipe['TastingNotes'] }}</textarea>
-                <!-- <p class="text-muted">{{ recipe['TastingNotes'] }}</p> -->
+            <div class="col-md-3 text-center">
+                <img src="/static/img/SRM/srm_{{'%.0f' | format(recipe['SRM'] | float)}}.png" alt="Puff Doggie Hops AI Beer" class="img-fluid" style="max-height: 200px;">
+            </div>
+            <div class="col-md-9">
+                <h1 class="mb-2">{{ recipe['name'] }}</h1>
+                <p class="text-muted">{{ recipe['TastingNotes'] }}</p>
                 <p class="text-muted small">Designed by {{recipe['author']}} on {{ recipe['CreationDate'] | format_datetime("%m/%d/%Y") }}</p>
                 <div class="d-flex justify-content-between align-items-center mt-3">
                     <div class="small text-uppercase text-muted">Style</div>
                     <div class="small text-uppercase text-muted">Units</div>
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div class="mb-0">
-                    <select class="form-control form-control-sm" id="recipe_StyleNameCode" name="recipe_StyleNameCode">
-                        {% for s in bjcp_2008_substyles %}
-                        <option value="{{ s }}" {{ 'selected' if (s == recipe['BeerStyle']['StyleNameCode'])}}>{{ s }}</option>
-                        {% endfor %}
-                    </select>
-                    </div>
-                    <!-- <div class="mb-0"><h4 class="mb-0">{{ recipe['BeerStyle']['StyleNameCode'] }}</h4><p class="text-muted small" class="mb-0">{{recipe['BeerStyle']['StyleGuide']}}: {{recipe['BeerStyle']['CatNumCode']}}.{{recipe['BeerStyle']['CatLettCode']}}</p></div> -->
+                    <div class="mb-0"><h4 class="mb-0">{{ recipe['BeerStyle']['StyleNameCode'] }}</h4><p class="text-muted small" class="mb-0">{{recipe['BeerStyle']['StyleGuide']}}: {{recipe['BeerStyle']['CatNumCode']}}.{{recipe['BeerStyle']['CatLettCode']}}</p></div>
                     <div class="mb-0"><h4 class="mb-0">{{ 'Imperial (Gal, Lb, Oz, °F)' if not recipe['UseMetric'] else 'UH OH... METRIC' }}</h4><p></p></div> <!-- TODO: Metric?  -->
                 </div>
             </div>
@@ -60,6 +50,56 @@
                 <div class="stat-label">ABV</div>
             </div>
             <div class="col-1"></div>
+        </div>
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title text-center">Grain Bill</h5>
+                        <div style="height: 150px; width: 150px; margin: 10px auto;">
+                            <canvas id="grainBillChart"></canvas>
+                        </div>
+                        <ul class="list-unstyled small mt-3">
+                            {% for f in recipe['Fermentables']|sort(attribute='Amount',reverse=true) %}
+                            <li class="d-flex justify-content-between">
+                                <div>{{ f['Name'] }}</div>
+                                <div>{{ f['Amount'] }}</div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title text-center">Hop Bill</h5>
+                        <div style="height: 150px; width: 150px; margin: 10px auto;">
+                            <canvas id="hopBillChart"></canvas>
+                        </div>
+                        <ul class="list-unstyled small mt-3 text-center">
+                            {% for f in recipe['Hops']|sort(attribute='Amount',reverse=true) %}
+                            <li class="d-flex justify-content-between">
+                                <div>{{ f['Name'] }} <a class="small text-muted" style="text-decoration:none">in {{ f['Location'] }}</a></div>
+                                <div>{{ f['Amount'] }}</div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title text-center">Wort Curve</h5>
+                        <div style="height: 200px; margin-bottom: 10px;">
+                            <canvas id="wortCurveChart"></canvas>
+                        </div>
+                        <p class="small mb-0 text-muted">Brew Time (Est.): **4 hrs and 19 mins** #TODO: FIX</p>
+                        <p class="small mb-0 text-muted">Chill Time (Est.): **2 hrs and 15 mins**#TODO: FIX</p>
+                    </div>
+                </div>
+            </div>
         </div>
         <hr>
         <h3 class="card-header-custom mb-3 pl-3 stats-box">WATER</h3>
@@ -454,9 +494,154 @@
             </div>
         </div>
     </div>
-    <div id="recipe_actions" class="actions mt-3">
-        <button type="submit" class="btn btn-sm btn-success">Save</button>
-    </div>
-</form>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script> -->
+    <input type="hidden"  id="grainData" value="{{ grainData }}">
+    <script>
+        // Register the datalabels plugin globally
+        Chart.register(ChartDataLabels);
+        
+        // Pass Python list for labels into a JavaScript array
+        const grainLabels = {{ grain_data.labels | tojson | safe }};
+        const grainValues = {{ grain_data.data | tojson | safe }};
+        
+        // --- Grain Bill Chart (Doughnut) ---
+        const grainData = {
+            labels: grainLabels, //['American Two-Row Pale', 'Belgian Candipls'],
+            datasets: [{
+                data: grainValues, // Approximate visual proportions from the image
+                // backgroundColor: ['#FFB347', '#6a5acd'],
+                // hoverBackgroundColor: ['#FFB347', '#6a5acd'],
+                borderWidth: 0
+            }]
+        };
+
+        const grainConfig = {
+            type: 'doughnut',
+            data: grainData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        display: false // Hide the standard legend
+                    },
+                    tooltip: {
+                        enabled: true
+                    },
+                    datalabels: { // Use datalabels to mimic the center text if needed, but keeping it simple
+                        display: false 
+                    }
+                }
+            }
+        };
+
+        new Chart(
+            document.getElementById('grainBillChart'),
+            grainConfig
+        );
+
+        // Pass Python list for labels into a JavaScript array
+        const hopsLabels = {{ hops_data.labels | tojson | safe }};
+        const hopsValues = {{ hops_data.data | tojson | safe }};
+
+        // --- Hop Bill Chart (Doughnut) ---
+        const hopData = {
+            labels: hopsLabels,
+            datasets: [{
+                // Approximate visual proportions from the image
+                data: hopsValues, 
+                // backgroundColor: ['#008000', '#7CFC00', '#3CB371', '#228B22'],
+                // hoverBackgroundColor: ['#008000', '#7CFC00', '#3CB371', '#228B22'],
+                borderWidth: 0
+            }]
+        };
+
+        const hopConfig = {
+            type: 'doughnut',
+            data: hopData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        enabled: true
+                    }
+                }
+            }
+        };
+
+        new Chart(
+            document.getElementById('hopBillChart'),
+            hopConfig
+        );
+
+        const wortCurveData = {{ wortCurveData | tojson | safe }};
+        
+        // --- Wort Curve Chart (Line) ---
+        const wortData = {
+            labels: Array.from({length: wortCurveData.length}, (_, i) => i), // 0 to 240 min
+            datasets: [{
+                label: 'Temperature',
+                data: wortCurveData,
+                // data: [
+                //     40, 40, 150, 150, 150, 150, // Mash (approx. 150°F)
+                //     212, 212, 212, 212, 212, 212, // Boil (approx. 212°F)
+                //     80 // Chill
+                // ],
+                borderColor: 'rgb(255, 165, 0)', // Orange line
+                backgroundColor: 'rgba(255, 165, 0, 0.1)',
+                fill: false,
+                tension: 0, // Straight lines
+                pointRadius: 0 // Hide points
+            }]
+        };
+
+        const wortConfig = {
+            type: 'line',
+            data: wortData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 250,
+                        title: {
+                            display: true,
+                            text: 'Temp (°F)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time (min)'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        enabled: true
+                    },
+                    datalabels: {
+                        display: false
+                    }
+                }
+            }
+        };
+
+        new Chart(
+            document.getElementById('wortCurveChart'),
+            wortConfig
+        );
+
+    </script>
 {% endwith %}
 {% endblock %}
