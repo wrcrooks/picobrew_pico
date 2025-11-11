@@ -140,6 +140,111 @@ LOVIBOND_COLOR_DATA = [
     }
 ]
 
+bjcp_2008_substyles = [
+    # 1. Light Lager
+    "Lite American Lager",
+    "Standard American Lager",
+    "Premium American Lager",
+    "Munich Helles",
+    "Dortmunder Export",
+    # 2. Pilsner
+    "German Pilsner (Pils)",
+    "Bohemian Pilsener",
+    "Classic American Pilsner",
+    # 3. European Amber Lager
+    "Vienna Lager",
+    "Oktoberfest/Märzen",
+    # 4. Dark Lager
+    "Dark American Lager",
+    "Munich Dunkel",
+    "Schwarzbier (Black Beer)",
+    # 5. Bock
+    "Maibock/Helles Bock",
+    "Traditional Bock",
+    "Doppelbock",
+    "Eisbock",
+    # 6. Light Hybrid Beer
+    "Cream Ale",
+    "Blond Ale",
+    "Kölsch",
+    "American Wheat/Rye Beer",
+    # 7. Amber Hybrid Beer
+    "Northern German Altbier",
+    "California Common",
+    "Düsseldorf Altbier",
+    # 8. English Pale Ale
+    "Standard/Ordinary Bitter",
+    "Special/Best/Premium Bitter",
+    "Extra Special/Strong Bitter (English Pale Ale)",
+    # 9. Scottish and Irish Ale
+    "Scottish Light",
+    "Scottish Heavy",
+    "Scottish Export",
+    "Irish Red Ale",
+    "Strong Scotch Ale (Wee Heavy)",
+    # 10. American Ale
+    "American Pale Ale",
+    "American Amber Ale",
+    "American Brown Ale",
+    # 11. English Brown Ale
+    "Mild",
+    "Southern English Brown Ale",
+    "Northern English Brown Ale",
+    # 12. Porter
+    "Brown Porter",
+    "Robust Porter",
+    "Baltic Porter",
+    # 13. Stout
+    "Dry Stout",
+    "Sweet Stout",
+    "Oatmeal Stout",
+    "Foreign Extra Stout",
+    "American Stout",
+    "Imperial Stout",
+    # 14. India Pale Ale (IPA)
+    "English IPA",
+    "American IPA",
+    "Imperial IPA",
+    # 15. German Wheat and Rye Beer
+    "Weizen/Weissbier",
+    "Dunkelweizen",
+    "Weizenbock",
+    "Roggenbier (Rye Beer)",
+    # 16. Belgian and French Ale
+    "Belgian Witbier",
+    "Belgian Pale Ale",
+    "Bière de Garde",
+    "Belgian Specialty Ale",
+    # 17. Sour Ale
+    "Berliner Weisse",
+    "Flanders Red Ale",
+    "Oud Bruin",
+    "Straight (Unblended) Lambic",
+    "Gueuze",
+    "Fruit Lambic",
+    # 18. Belgian Strong Ale
+    "Belgian Blond Ale",
+    "Belgian Dubbel",
+    "Belgian Tripel",
+    "Belgian Golden Strong Ale",
+    "Belgian Dark Strong Ale",
+    # 19. Strong Ale
+    "Old Ale",
+    "English Barleywine",
+    "American Barleywine",
+    # 20. Fruit Beer
+    "Fruit Beer",
+    # 21. Spice/Herb/Vegetable Beer
+    "Spice, Herb, or Vegetable Beer",
+    "Christmas/Winter Specialty Spiced Beer",
+    # 22. Smoke-Flavored and Wood-Aged Beer
+    "Classic Rauchbier",
+    "Other Smoked Beer",
+    "Wood-Aged Beer",
+    # 23. Specialty Beer
+    "Specialty Beer"
+]
+
 class PicoBrewSession:
     def __init__(self, machineType=None):
         self.file = None
