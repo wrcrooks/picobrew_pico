@@ -23,7 +23,7 @@ from .session_parser import (_paginate_sessions, list_session_files,
                              get_brew_graph_data, get_ferm_graph_data, get_still_graph_data, get_iSpindel_graph_data, get_tilt_graph_data,
                              active_brew_sessions, active_ferm_sessions, active_still_sessions, active_iSpindel_sessions, active_tilt_sessions,
                              add_invalid_session, get_invalid_sessions, load_brew_sessions)
-from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION, SRM_COLOR_DATA, LOVIBOND_COLOR_DATA
+from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION, SRM_COLOR_DATA, LOVIBOND_COLOR_DATA, bjcp_2008_substyles
 
 file_glob_pattern = "[!._]*.json"
 yaml = YAML()
@@ -552,7 +552,62 @@ def _recipe(args):
         for k in ZSERIES_LOCATION.keys():
             if ZSERIES_LOCATION[k] == str(recipe['MachineSteps'][s]['StepLocation']):
                 recipe['MachineSteps'][s]['StepLocation'] = k.replace("Adjunct", "Adjunct ").replace("PassThru", "Pass Through")
-    return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData)
+    return render_template_with_defaults('recipe_viewer.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData)
+
+@main.route('/recipe/edit/<rfid>', methods=['GET', 'POST'])
+def _recipe_edit(rfid):
+    global redux_recipes, invalid_recipes
+    redux_recipes = load_redux_recipes()
+    recipe = new_zymatic_recipe()
+    for r in redux_recipes:
+        if r.id == rfid:
+            recipe = json.loads(json.dumps(r, default=lambda r: r.__dict__))
+    GB_labels = [f['Name'] for f in recipe['Fermentables']]
+    GB_amounts = [f['Amount'] for f in recipe['Fermentables']]
+    GRAIN_BILL_DATA = {
+        'labels': GB_labels, 'data': GB_amounts
+    }
+    HB_labels = [h['Name'] for h in recipe['Hops']]
+    HB_amounts = [h['Amount'] for h in recipe['Hops']]
+    HOPS_BILL_DATA = {
+        'labels': HB_labels, 'data': HB_amounts
+    }
+    wortCurveData = []
+    for s in recipe['MachineSteps']:
+        for m in range(s['Time']):
+            wortCurveData.append(int(s['Temperature']))
+    for s in range(len(recipe['Hops'])):
+        for k in ZSERIES_LOCATION.keys():
+            if ZSERIES_LOCATION[k] == str(recipe['Hops'][s]['Location']):
+                recipe['Hops'][s]['Location'] = k.replace("Adjunct", "Adjunct ")
+    for s in range(len(recipe['BoilSteps'])):
+        for k in ZSERIES_LOCATION.keys():
+            if ZSERIES_LOCATION[k] == str(recipe['BoilSteps'][s]['Location']):
+                recipe['BoilSteps'][s]['Location'] = k.replace("Adjunct", "Adjunct ")
+    for s in range(len(recipe['WhirlpoolSteps'])):
+        for k in ZSERIES_LOCATION.keys():
+            if ZSERIES_LOCATION[k] == str(recipe['WhirlpoolSteps'][s]['Location']):
+                recipe['WhirlpoolSteps'][s]['Location'] = k.replace("Adjunct", "Adjunct ")
+    for s in range(len(recipe['MachineSteps'])):
+        for k in ZSERIES_LOCATION.keys():
+            if ZSERIES_LOCATION[k] == str(recipe['MachineSteps'][s]['StepLocation']):
+                recipe['MachineSteps'][s]['StepLocation'] = k.replace("Adjunct", "Adjunct ").replace("PassThru", "Pass Through")
+    return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, bjcp_2008_substyles=bjcp_2008_substyles)
+
+@main.route('/recipe/clone/<rfid>', methods=['GET'])
+def _recipe_clone(rfid):
+    # if request.method == 'DELETE':
+    newID = uuid.uuid4().hex[:32]
+    print(rfid + " : " + request.method)
+    print("New ID:" + newID)
+    return '', 204
+
+@main.route('/recipe/delete/<rfid>', methods=['GET'])
+def _recipe_delete(rfid):
+    # if request.method == 'DELETE':
+    print(rfid + " : " + request.method)
+    return '', 204
+
 
 @main.route('/ingredients')
 def _ingredients():
