@@ -728,6 +728,10 @@ def sync_recipe(args):
     return 'could not sync - failed to find recipe.id {recipe_id}', 404
 
 
+@main.route('/scanner')
+def _scanner():
+    return render_template_with_defaults('scanner.html')
+
 def load_recipe(filename, mtype):
     if mtype in [MachineType.PICOBREW, MachineType.PICOBREW_C, MachineType.PICOBREW_C_ALT]:
         return load_pico_recipe(filename)
