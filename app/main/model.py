@@ -34,6 +34,7 @@ PICO_LOCATION = {
     'Adjunct2': '4',
     'Adjunct3': '6',
     'Adjunct4': '5',
+    'Pause': '6',
 }
 
 PICO_SESSION = {
