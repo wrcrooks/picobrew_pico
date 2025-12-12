@@ -426,6 +426,8 @@ def load_ingredients():
         ingredients = None
         with open(filepath) as f:
             ingredients = json.load(f)
+            for i in [ingredients['Fermentables'], ingredients['Hops'], ingredients['Yeast'], ingredients['WaterAmendments']]:
+                print(i + '\n')
             return ingredients
     except Exception as e:
         current_app.logger.error("ERROR: An exception occurred parsing ingredients {}".format(file))
@@ -594,6 +596,14 @@ def _recipe_edit(rfid):
                 recipe['MachineSteps'][s]['StepLocation'] = k.replace("Adjunct", "Adjunct ").replace("PassThru", "Pass Through")
     return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, bjcp_2008_substyles=bjcp_2008_substyles)
 
+@main.route('/api/modifyRecipe', methods=['POST'])
+def _api_modifyRecipe():
+    data = request.get_json()
+    data = data.replace("&#39;", '"').replace(": None", ': null').replace(': True', ': true').replace(': False', ': false').replace('\n', '\\n')
+    data = json.loads(data)
+    print(data)
+    return '', 204
+
 @main.route('/recipe/clone/<rfid>', methods=['GET'])
 def _recipe_clone(rfid):
     # if request.method == 'DELETE':
@@ -621,6 +631,25 @@ def _ingredients():
                 f['ColorCategory'] = c['Category']
     # recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
     return render_template_with_defaults('ingredients.html', ingredients=ingredients)
+
+@main.route('/ingredient/edit/<id>', methods=['GET', 'POST'])
+def _ingredient_edit(id):
+    ##
+    return render_template_with_defaults('ingredient_editor.html')
+
+@main.route('/ingredient/clone/<id>', methods=['GET'])
+def _ingredient_clone(id):
+    # if request.method == 'DELETE':
+    newID = uuid.uuid4().hex[:32]
+    print(id + " : " + request.method)
+    print("New ID:" + newID)
+    return '', 204
+
+@main.route('/ingredient/delete/<id>', methods=['GET'])
+def _ingredient_delete(id):
+    # if request.method == 'DELETE':
+    print(id + " : " + request.method)
+    return '', 204
 
 #   Recipe: /API/pico/getRecipe?rfid={rfid}
 # Response: HTML

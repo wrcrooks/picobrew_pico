@@ -59,7 +59,7 @@ function initiatizeChart(graph_data) {
       },
 
       labels: {
-        format: '{value:,.0f}'
+        format: '{value:,.1f}'
       },
 
       tickPositioner: function () {
@@ -79,7 +79,7 @@ function initiatizeChart(graph_data) {
       },
     }, {
       title: {
-        text: 'Specific Gravity'
+        text: 'Approximate ABV (%)'
       },
 
       labels: {
@@ -103,8 +103,34 @@ function initiatizeChart(graph_data) {
       },
 
       opposite: true
-    }],
+    }, {
+      title: {
+        text: 'Specific Gravity'
+      },
 
+      labels: {
+        format: '{value:,.4f}'
+      },
+
+      tickPositioner: function () {
+        var positions = [],
+          incrementNum = TickAmountValue - 1,
+          maxTick = this.dataMax,
+          tick = this.dataMin,
+          increment = (maxTick - this.dataMin) / incrementNum;
+
+        if (this.dataMax !== null && this.dataMin !== null) {
+          for (let i = 0; i <= incrementNum; i++) {
+            positions.push(tick),
+              tick += increment;
+          }
+        }
+        return positions;
+      },
+
+      opposite: true
+    }],
+    
     series: graph_data.series,
   });
 }

@@ -15,7 +15,8 @@ Highcharts.chart(graph_data.chart_id, {
           self.setTitle(graph_data.title, { text: data.subtitle });
           for (point of data['data']) {
             self.series[0].addPoint([point.time, point.temp]);
-            self.series[1].addPoint([point.time, point.gravity]);
+            self.series[1].addPoint([point.time, point.abv]);
+            self.series[2].addPoint([point.time, point.gravity]);
           }
         });
       },
@@ -73,7 +74,7 @@ Highcharts.chart(graph_data.chart_id, {
     },
 
     labels: {
-      format: '{value:,.0f}'
+      format: '{value:,.1f}'
     },
 
     tickPositioner: function () {
@@ -93,11 +94,37 @@ Highcharts.chart(graph_data.chart_id, {
     },
   }, {
     title: {
-      text: 'Specific Gravity'
+      text: 'Approximate ABV (%)'
     },
 
     labels: {
       format: '{value:,.3f}'
+    },
+
+    tickPositioner: function () {
+      var positions = [],
+        incrementNum = TickAmountValue - 1,
+        maxTick = this.dataMax,
+        tick = this.dataMin,
+        increment = (maxTick - this.dataMin) / incrementNum;
+
+      if (this.dataMax !== null && this.dataMin !== null) {
+        for (let i = 0; i <= incrementNum; i++) {
+          positions.push(tick),
+            tick += increment;
+        }
+      }
+      return positions;
+    },
+
+    opposite: true
+  }, {
+    title: {
+      text: 'Specific Gravity'
+    },
+
+    labels: {
+      format: '{value:,.4f}'
     },
 
     tickPositioner: function () {

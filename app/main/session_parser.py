@@ -435,9 +435,11 @@ def load_iSpindel_session(file):
 def get_iSpindel_graph_data(chart_id, voltage, session_data):
     temp_data = []
     gravity_data = []
+    abv_data = []
     for data in session_data:
         temp_data.append([data['time'], float(data['temp'])])
         gravity_data.append([data['time'], float(data['gravity'])])
+        abv_data.append([data['time'], float(data['abv'])])
     graph_data = {
         'chart_id': str(chart_id),
         'title': {'text': 'Fermentation'},
@@ -447,9 +449,13 @@ def get_iSpindel_graph_data(chart_id, voltage, session_data):
                 'name': 'Temperature',
                 'data': temp_data
             }, {
+                'name': 'ABV',
+                'data': abv_data,
+                'yAxis': 1
+            }, {
                 'name': 'Specific Gravity',
                 'data': gravity_data,
-                'yAxis': 1
+                'yAxis': 2
             }
         ],
     }

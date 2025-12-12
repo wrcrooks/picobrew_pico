@@ -6,8 +6,10 @@
 <script src="/static/js/base_recipe.js"></script>
 <script src="/static/js/pico_recipe.js"></script>
 <script>var tables = {};</script>
+<script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.js"></script>
+<script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap5.js"></script>
 <!-- {% include "units_selector.html" %} -->
-{% with recipe_type='pico' %}
 <form method="POST" action="{{ url_for('main._recipe_edit', rfid=recipe['id']) }}" style="display:inline;">
     <div id="recipe_actions" class="actions">
         <button type="submit" class="btn btn-sm btn-success">Save</button>
@@ -15,7 +17,18 @@
     <div class="container recipe-container">
         <div class="row">
             <div class="col-md-12">
-                <input type="text" class="form-control form-control-sm mb-3" name="recipe_name" id="recipe_name" placeholder="Name" value="{{ recipe['name'] }}">
+                <div class="row">
+                    <div class=" col-md-9">
+                        <input type="text" class="form-control form-control-sm mb-3" name="recipe_name" id="recipe_name" placeholder="Name" value="{{ recipe['name'] }}">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-control form-control-sm" id="recipe_StyleNameCode" name="recipe_StyleNameCode">
+                            <option value="pico" selected>Pico S/C/Pro</option>
+                            <option value="zseries">Z Series</option>
+                            <option value="zymatic">Zymatic</option>
+                        </select>
+                    </div>
+                </div>
                 <!-- <h1 class="mb-2">{{ recipe['name'] }}</h1> -->
                 <textarea type="text" class="form-control form-control-sm" name="recipe_name" id="recipe_name" placeholder="Tasting Notes" rows="4">{{ recipe['TastingNotes'] }}</textarea>
                 <!-- <p class="text-muted">{{ recipe['TastingNotes'] }}</p> -->
@@ -458,5 +471,4 @@
         <button type="submit" class="btn btn-sm btn-success">Save</button>
     </div>
 </form>
-{% endwith %}
 {% endblock %}

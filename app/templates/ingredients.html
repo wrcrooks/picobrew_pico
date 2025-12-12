@@ -75,16 +75,21 @@
           </div>
           <div class="col-2 text-start border-start d-flex justify-content-end">
             <div class="px-3">
+              <a href="{{ url_for('main._ingredient_edit', id='NONE') }}">
               <button class="btn btn-sm btn-success">
                 <i class="fas fa-pencil"></i>
               </button>
               </a>
+              <a href="{{ url_for('main._ingredient_clone', id='NONE') }}">
               <button class="btn btn-sm btn-info">
                 <i class="fas fa-copy"></i>
               </button>
+              </a>
+              <a href="{{ url_for('main._ingredient_delete', id='NONE') }}">
               <button class="btn btn-sm btn-danger">
                 <i class="fas fa-trash"></i>
               </button>
+              </a>
             </div>
           </div>
         </div>

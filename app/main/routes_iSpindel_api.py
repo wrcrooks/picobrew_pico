@@ -43,6 +43,14 @@ def process_iSpindel_data(data):
         if active_iSpindel_sessions[uid].uninit:
             create_new_session(uid)
 
+        abv_pct = 0
+
+        if len(active_iSpindel_sessions[uid].data) > 1:
+            original_gravity = active_iSpindel_sessions[uid].data[0]['gravity']
+            last_gravity = data['gravity']
+            standard_abv = round((original_gravity - last_gravity) * 1.3125, 4) # decimal ABV calc (ex. 0.04867);
+            abv_pct = round(standard_abv * 100, 2)
+
         time = ((datetime.utcnow() - datetime(1970, 1, 1)).total_seconds() * 1000)
         session_data = []
         log_data = ''
@@ -52,6 +60,7 @@ def process_iSpindel_data(data):
             'angle': data['angle'],
             'battery': data['battery'],
             'gravity': data['gravity'],
+            'abv': abv_pct,
         }
 
         session_data.append(point)

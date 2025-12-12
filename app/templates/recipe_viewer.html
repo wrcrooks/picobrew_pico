@@ -145,6 +145,7 @@
         <div class="row justify-content-center">
             <div class="col-10">
                 <p class="small text-muted text-center">Mash Steps</p>
+                <div id="mash-steps-table"></div>
                 <table class="table table-sm">
                     <thead>
                         <tr>
@@ -644,4 +645,82 @@
 
     </script>
 {% endwith %}
+{% endblock %}
+{% block scripts %}
+<script>
+    const mashStepsTableDiv = document.getElementById('mash-steps-table');
+
+    const updateUrl = (prev, query) => {
+        return prev + (prev.indexOf('?') >= 0 ? '&' : '?') + new URLSearchParams(query).toString();
+    };
+
+    const editableCellAttributes = (data, row, col) => {
+        if (row) {
+            return {contentEditable: 'true', 'data-element-id': row.cells[0].data};
+        }
+        else {
+            return {};
+        }
+    };
+
+    new gridjs.Grid({
+        columns: [
+            { id: 'step', name: 'Step' },
+            { id: 'temp', name: 'Temp (°F)', 'attributes': editableCellAttributes },
+            { id: 'time', name: 'Time (m)', 'attributes': editableCellAttributes },
+        ],
+        data: [
+            {% for s in recipe['MashSteps'] %}
+            {
+                step: '{{ s['Name'] }}',
+                temp: '{{ s['Temp'] }}',
+                time: '{{ s['Time'] }}'
+            },
+            {% endfor %}
+        ],
+        style: {
+            table: {
+                'border': '2px solid #ccc',
+                'border-radius': '0px'
+            },
+        },
+        search: false,
+        sort: false,
+        pagination: false,
+    }).render(mashStepsTableDiv);
+
+    let savedValue;
+
+    mashStepsTableDiv.addEventListener('focusin', ev => {
+        if (ev.target.tagName === 'TD') {
+            savedValue = ev.target.textContent;
+        }
+    });
+
+    mashStepsTableDiv.addEventListener('focusout', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (savedValue !== ev.target.textContent) {
+                fetch('/api/modifyRecipe', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify('{{ recipe }}'),
+                });
+            }
+            savedValue = undefined;
+        }
+    });
+
+    mashStepsTableDiv.addEventListener('keydown', ev => {
+        if (ev.target.tagName === 'TD') {
+            if (ev.key === 'Escape') {
+                ev.target.textContent = savedValue;
+                ev.target.blur();
+            }
+            else if (ev.key === 'Enter') {
+                ev.preventDefault();
+                ev.target.blur();
+            }
+        }
+    });
+</script>
 {% endblock %}
