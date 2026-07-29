@@ -293,13 +293,13 @@ def recipe_dirpath(machine_type):
 def upload_file(machine_type):
     # check if the post request has the file part
     if 'recipe' not in request.files:
-        current_app.logger.error(f'invalid input : no file part')
+        current_app.logger.error('invalid input : no file part')
         return 'No file part', 400
     file = request.files['recipe']
     # if user does not select file, browser also
     # submit an empty part without filename
     if file.filename == '':
-        current_app.logger.error(f'invalid input : no selected file')
+        current_app.logger.error('invalid input : no selected file')
         return 'no selected file', 400
     if file and allowed_extension(file.filename):
         filename = secure_filename(file.filename).replace(' ', '_')
@@ -430,7 +430,7 @@ def load_ingredients():
                 print(i + '\n')
             return ingredients
     except Exception as e:
-        current_app.logger.error("ERROR: An exception occurred parsing ingredients {}".format(file))
+        current_app.logger.error("ERROR: An exception occurred parsing ingredients {}".format(filepath))
         current_app.logger.error(e)
 
 def parse_recipe(machineType, recipe, file):
@@ -482,7 +482,7 @@ def delete_file():
                 invalid_sessions[body['type']].remove(Path(filename))
             return '', 204
         current_app.logger.error("ERROR: failed to delete {} session file {}".format(body['type'], filename))
-        return "Delete Filename: Failed to find {} session file".format(body['type'], filename), 418
+        return "Delete Filename: Failed to find {} session file {}".format(body['type'], filename), 418
     else:
         current_app.logger.error("ERROR: failed to delete {} as the file type {} was not supported".format(filename, body['type']))
     return 'Delete Filename: Unsupported file type specified {}'.format(body['type']), 418

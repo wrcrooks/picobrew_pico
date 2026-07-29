@@ -14,6 +14,11 @@ from .config import base_path, recipe_path, session_path
 from .frontend_common import platform, render_template_with_defaults, system_info
 
 
+def _sed_escape_replacement(value):
+    """Escape characters with special meaning in a sed replacement string (\\, / and &)."""
+    return re.sub(r'([\\/&])', r'\\\1', value)
+
+
 # -------- Routes --------
 @main.route('/restart_server')
 def restart_server():
@@ -73,7 +78,10 @@ def download_logs(log_type):
         elif log_type == 'nginx.error':
             filename = "/var/log/nginx/picobrew.error.log"
         elif log_type == 'picobrew_pico':
-            max_lines = request.args.get('max', 20000)
+            try:
+                max_lines = int(request.args.get('max', 20000))
+            except (TypeError, ValueError):
+                return 'invalid max parameter', 400
             filename = f"{current_app.config['BASE_PATH']}/app/logs/picobrew_pico.log"
             subprocess.check_output(f"systemctl status rc.local -n {max_lines} > {filename}", shell=True)
         else:
@@ -144,8 +152,9 @@ def setup():
                     # set ssid in wpa_supplicant files
                     # regex \b marks a word boundary
                     ssid = payload['ssid']
+                    ssid_sed_script = 's/\\bssid=.*/ssid="{}"/'.format(_sed_escape_replacement(ssid))
                     subprocess.check_output(
-                        """sed -i 's/\\bssid=.*/ssid="{}"/' {}""".format(ssid, wpa_files), shell=True)
+                        "sed -i {} {}".format(shlex.quote(ssid_sed_script), wpa_files), shell=True)
 
                     # set bssid (if set by user) in wpa_supplicant files
                     if 'bssid' in payload and payload['bssid']:
@@ -153,8 +162,9 @@ def setup():
                         # remove comment for bssid line (if present)
                         subprocess.check_output(
                             """sudo sed -i '/bssid/s/# *//g' {}""".format(wpa_files), shell=True)
+                        bssid_sed_script = 's/bssid=.*/bssid={}/'.format(_sed_escape_replacement(bssid))
                         subprocess.check_output(
-                            """sudo sed -i 's/bssid=.*/bssid={}/' {}""".format(bssid, wpa_files), shell=True)
+                            "sudo sed -i {} {}".format(shlex.quote(bssid_sed_script), wpa_files), shell=True)
                     else:
                         # add a comment for bssid line (if present)
                         subprocess.check_output(
@@ -163,8 +173,9 @@ def setup():
                     # set credentials (if set by user) in wpa_supplicant files
                     if 'password' in payload:
                         psk = payload['password']
+                        psk_sed_script = 's/psk=.*/psk="{}"/'.format(_sed_escape_replacement(psk))
                         subprocess.check_output(
-                            """sed -i 's/psk=.*/psk="{}"/' {}""".format(psk, wpa_files), shell=True)
+                            "sed -i {} {}".format(shlex.quote(psk_sed_script), wpa_files), shell=True)
 
                     def restart_wireless():
                         import subprocess
@@ -180,7 +191,7 @@ def setup():
                     return '', 204
                     # TODO: redirect to a page with alert of success or failure of wireless service reset
                 except Exception:
-                    current_app.logger.error("ERROR: error occured in wireless setup:", sys.exc_info()[2])
+                    current_app.logger.error("ERROR: error occured in wireless setup:")
                     current_app.logger.error(traceback.format_exc())
                     return 'Wireless Setup Failed!', 418
             elif payload['interface'] == 'ap0':
@@ -189,14 +200,16 @@ def setup():
 
                     # set ssid in hostapd file
                     ssid = payload['ssid']
+                    ssid_sed_script = 's/ssid=.*/ssid={}/'.format(_sed_escape_replacement(ssid))
                     subprocess.check_output(
-                        """sed -i -e 's/ssid=.*/ssid={}/' {}""".format(ssid, hostapd_file), shell=True)
+                        "sed -i -e {} {}".format(shlex.quote(ssid_sed_script), hostapd_file), shell=True)
 
                     # set credentials (if set by user) in hostapd file
                     if 'password' in payload and payload['password']:
                         psk = payload['password']
+                        psk_sed_script = 's/wpa_passphrase=.*/wpa_passphrase={}/'.format(_sed_escape_replacement(psk))
                         subprocess.check_output(
-                            """sed -i -e 's/wpa_passphrase=.*/wpa_passphrase={}/' {}""".format(psk, hostapd_file), shell=True)
+                            "sed -i -e {} {}".format(shlex.quote(psk_sed_script), hostapd_file), shell=True)
 
                     def restart_ap0_interface():
                         import subprocess
@@ -210,14 +223,14 @@ def setup():
 
                     return '', 204
                 except Exception:
-                    current_app.logger.error("ERROR: error occured in wireless setup:", sys.exc_info()[2])
+                    current_app.logger.error("ERROR: error occured in wireless setup:")
                     current_app.logger.error(traceback.format_exc())
                     return 'Wireless Setup Failed!', 418
             else:
-                current_app.logger.error("ERROR: invalid interface provided %s".format(payload['interface']))
+                current_app.logger.error("ERROR: invalid interface provided {}".format(payload['interface']))
                 return 'Invalid Interface Provided - Setup Failed!', 418
         else:
-            current_app.logger.error("ERROR: unsupported payload received %s".format(payload))
+            current_app.logger.error("ERROR: unsupported payload received {}".format(payload))
             return 'Invalid Setup Payload Received - Setup Failed!', 418
     else:
         if platform() == "RaspberryPi":
