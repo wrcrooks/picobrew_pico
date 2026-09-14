@@ -5,11 +5,28 @@
 <script src="/static/js/pico_image.js"></script>
 <script src="/static/js/base_recipe.js"></script>
 <script src="/static/js/pico_recipe.js"></script>
+<script src="/static/js/recipe_editor.js"></script>
 <script>var tables = {};</script>
 <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.js"></script>
 <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap5.js"></script>
 <!-- {% include "units_selector.html" %} -->
+{% macro row_actions() %}
+<td class="text-nowrap">
+    <button type="button" class="btn btn-sm btn-outline-secondary recipe-row-up" title="Move up"><i class="fas fa-arrow-up"></i></button>
+    <button type="button" class="btn btn-sm btn-outline-secondary recipe-row-down" title="Move down"><i class="fas fa-arrow-down"></i></button>
+    <button type="button" class="btn btn-sm btn-outline-danger recipe-row-remove" title="Remove row"><i class="fas fa-trash"></i></button>
+</td>
+{% endmacro %}
+{% macro add_row_row(table_name, colspan) %}
+<tr>
+    <td colspan="{{ colspan }}">
+        <button type="button" class="btn btn-sm btn-outline-primary w-100" data-add-row-for="{{ table_name }}">
+            <i class="fas fa-plus"></i> Add Row
+        </button>
+    </td>
+</tr>
+{% endmacro %}
 <form method="POST" action="{{ url_for('main._recipe_edit', rfid=recipe['id']) }}" style="display:inline;">
     <div id="recipe_actions" class="actions">
         <button type="submit" class="btn btn-sm btn-success">Save</button>
@@ -18,20 +35,11 @@
         <div class="row">
             <div class="col-md-12">
                 <div class="row">
-                    <div class=" col-md-9">
-                        <input type="text" class="form-control form-control-sm mb-3" name="recipe_name" id="recipe_name" placeholder="Name" value="{{ recipe['name'] }}">
-                    </div>
-                    <div class="col-md-3">
-                        <select class="form-control form-control-sm" id="recipe_StyleNameCode" name="recipe_StyleNameCode">
-                            <option value="pico" selected>Pico S/C/Pro</option>
-                            <option value="zseries">Z Series</option>
-                            <option value="zymatic">Zymatic</option>
-                        </select>
+                    <div class="col-md-12">
+                        <input type="text" class="form-control form-control-sm mb-3" name="Name" id="recipe_name" placeholder="Name" value="{{ recipe['name'] }}">
                     </div>
                 </div>
-                <!-- <h1 class="mb-2">{{ recipe['name'] }}</h1> -->
-                <textarea type="text" class="form-control form-control-sm" name="recipe_name" id="recipe_name" placeholder="Tasting Notes" rows="4">{{ recipe['TastingNotes'] }}</textarea>
-                <!-- <p class="text-muted">{{ recipe['TastingNotes'] }}</p> -->
+                <textarea class="form-control form-control-sm" name="TastingNotes" id="recipe_tasting_notes" placeholder="Tasting Notes" rows="4">{{ recipe['TastingNotes'] }}</textarea>
                 <p class="text-muted small">Designed by {{recipe['author']}} on {{ recipe['CreationDate'] | format_datetime("%m/%d/%Y") }}</p>
                 <div class="d-flex justify-content-between align-items-center mt-3">
                     <div class="small text-uppercase text-muted">Style</div>
@@ -39,13 +47,12 @@
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <div class="mb-0">
-                    <select class="form-control form-control-sm" id="recipe_StyleNameCode" name="recipe_StyleNameCode">
+                    <select class="form-control form-control-sm" id="recipe_StyleNameCode" name="StyleNameCode">
                         {% for s in bjcp_2008_substyles %}
                         <option value="{{ s }}" {{ 'selected' if (s == recipe['BeerStyle']['StyleNameCode'])}}>{{ s }}</option>
                         {% endfor %}
                     </select>
                     </div>
-                    <!-- <div class="mb-0"><h4 class="mb-0">{{ recipe['BeerStyle']['StyleNameCode'] }}</h4><p class="text-muted small" class="mb-0">{{recipe['BeerStyle']['StyleGuide']}}: {{recipe['BeerStyle']['CatNumCode']}}.{{recipe['BeerStyle']['CatLettCode']}}</p></div> -->
                     <div class="mb-0"><h4 class="mb-0">{{ 'Imperial (Gal, Lb, Oz, °F)' if not recipe['UseMetric'] else 'UH OH... METRIC' }}</h4><p></p></div> <!-- TODO: Metric?  -->
                 </div>
             </div>
@@ -83,31 +90,41 @@
                 {% endfor %}
             </div>
         </div>
-        {% if recipe['WaterAmendments']|length > 0 %}
         <div class="row justify-content-center">
             <div class="col-10">
                 <p class="small text-muted text-center">Water Amendments</p>
-                <table class="table table-sm">
+                <input type="hidden" name="Amendments.__present" value="1">
+                <table class="table table-sm" id="table-Amendments" data-recipe-table="Amendments">
                     <thead>
                         <tr>
                             <th>Ingredient</th>
                             <th>Amount</th>
                             <th>Units</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for a in recipe['WaterAmendments'] %}
-                        <tr>
-                            <td>{{ a['Name'] }}</td>
-                            <td>{{ a['Amount'] }}</td>
-                            <td>{{ 'oz' if a['Units'] == None else '?' }}</td>
+                        <tr data-recipe-row>
+                            <td><input type="hidden" name="Amendments.{{ loop.index0 }}.__extra" value="{{ a | tojson | forceescape }}"><input type="text" class="form-control form-control-sm" name="Amendments.{{ loop.index0 }}.Name" value="{{ a['Name'] }}"></td>
+                            <td><input type="number" step="0.01" class="form-control form-control-sm" name="Amendments.{{ loop.index0 }}.Amount" value="{{ a['Amount'] }}"></td>
+                            <td><input type="text" class="form-control form-control-sm" name="Amendments.{{ loop.index0 }}.Units" value="{{ a['Units'] or '' }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('Amendments', 4) }}
                     </tbody>
                 </table>
+                <template id="row-template-Amendments">
+                    <tr data-recipe-row>
+                        <td><input type="hidden" name="Amendments.__new__.__extra" value="{}"><input type="text" class="form-control form-control-sm" name="Amendments.__new__.Name" value=""></td>
+                        <td><input type="number" step="0.01" class="form-control form-control-sm" name="Amendments.__new__.Amount" value="0"></td>
+                        <td><input type="text" class="form-control form-control-sm" name="Amendments.__new__.Units" value=""></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
             </div>
         </div>
-        {% endif %}
         <hr>
         <h3 class="card-header-custom mb-3 pl-3 stats-box">MASH / FERMENTABLES</h3>
         <div class="row mb-3">
@@ -118,44 +135,68 @@
         <div class="row justify-content-center">
             <div class="col-10">
                 <p class="small text-muted text-center">Mash Steps</p>
-                <table class="table table-sm">
+                <input type="hidden" name="MashSteps.__present" value="1">
+                <table class="table table-sm" id="table-MashSteps" data-recipe-table="MashSteps">
                     <thead>
                         <tr>
                             <th>Step</th>
                             <th>Temp (°F)</th>
                             <th>Time (m)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for s in recipe['MashSteps'] %}
-                        <tr>
-                            <td>{{ s['Name'] }}</td>
-                            <td>{{ s['Temp'] }}</td>
-                            <td>{{ s['Time'] }}</td>
+                        <tr data-recipe-row>
+                            <td><input type="hidden" name="MashSteps.{{ loop.index0 }}.__extra" value="{{ s | tojson | forceescape }}"><input type="text" class="form-control form-control-sm" name="MashSteps.{{ loop.index0 }}.Name" value="{{ s['Name'] }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="MashSteps.{{ loop.index0 }}.Temp" value="{{ s['Temp'] }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="MashSteps.{{ loop.index0 }}.Time" value="{{ s['Time'] }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('MashSteps', 4) }}
                     </tbody>
                 </table>
+                <template id="row-template-MashSteps">
+                    <tr data-recipe-row>
+                        <td><input type="hidden" name="MashSteps.__new__.__extra" value="{}"><input type="text" class="form-control form-control-sm" name="MashSteps.__new__.Name" value="New Step"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="MashSteps.__new__.Temp" value="150"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="MashSteps.__new__.Time" value="0"></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
                 <hr/>
                 <p class="small text-muted text-center">Fermentables</p>
-                <table class="table table-sm">
+                <input type="hidden" name="Fermentables.__present" value="1">
+                <table class="table table-sm" id="table-Fermentables" data-recipe-table="Fermentables">
                     <thead>
                         <tr>
                             <th>Ingredient</th>
                             <th>Amount (lbs)</th>
                             <th>Color (pts)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for f in recipe['Fermentables'] %}
-                        <tr>
-                            <td>{{ f['Name'] }}</td>
-                            <td>{{ f['Amount'] }}</td>
-                            <td>{{ "%.1f" | format(f['ColorPts'] | float) }}</td>
+                        <tr data-recipe-row>
+                            <td><input type="hidden" name="Fermentables.{{ loop.index0 }}.__extra" value="{{ f | tojson | forceescape }}"><input type="text" class="form-control form-control-sm" name="Fermentables.{{ loop.index0 }}.Name" value="{{ f['Name'] }}"></td>
+                            <td><input type="number" step="0.01" class="form-control form-control-sm" name="Fermentables.{{ loop.index0 }}.Amount" value="{{ f['Amount'] }}"></td>
+                            <td><input type="number" step="0.1" class="form-control form-control-sm" name="Fermentables.{{ loop.index0 }}.ColorPts" value="{{ '%.1f' | format(f['ColorPts'] | float) }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('Fermentables', 4) }}
                     </tbody>
                 </table>
+                <template id="row-template-Fermentables">
+                    <tr data-recipe-row>
+                        <td><input type="hidden" name="Fermentables.__new__.__extra" value="{}"><input type="text" class="form-control form-control-sm" name="Fermentables.__new__.Name" value=""></td>
+                        <td><input type="number" step="0.01" class="form-control form-control-sm" name="Fermentables.__new__.Amount" value="0"></td>
+                        <td><input type="number" step="0.1" class="form-control form-control-sm" name="Fermentables.__new__.ColorPts" value="0"></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
             </div>
         </div>
         <hr>
@@ -170,53 +211,91 @@
         <div class="row justify-content-center">
             <div class="col-10">
                 <p class="small text-muted text-center">Boil Steps</p>
-                <table class="table table-sm">
+                <input type="hidden" name="BoilSteps.__present" value="1">
+                <table class="table table-sm" id="table-BoilSteps" data-recipe-table="BoilSteps">
                     <thead>
                         <tr>
                             <th>Location</th>
                             <th>Temp (°F)</th>
                             <th>Boil Time (m)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for s in recipe['BoilSteps'] %}
-                        <tr>
-                            <td>{{ s['Location'] }}</td>
-                            <td>{{ s['Temp'] }}</td>
-                            <td>{{ s['Time'] }}</td>
+                        <tr data-recipe-row>
+                            <td>
+                                <input type="hidden" name="BoilSteps.{{ loop.index0 }}.__extra" value="{{ s | tojson | forceescape }}">
+                                <select class="form-control form-control-sm" name="BoilSteps.{{ loop.index0 }}.Location">
+                                    {% for code, label in location_options %}
+                                    <option value="{{ code }}" {{ 'selected' if code == (s['Location']|string) }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="BoilSteps.{{ loop.index0 }}.Temp" value="{{ s['Temp'] }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="BoilSteps.{{ loop.index0 }}.Time" value="{{ s['Time'] }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('BoilSteps', 4) }}
                     </tbody>
                 </table>
+                <template id="row-template-BoilSteps">
+                    <tr data-recipe-row>
+                        <td>
+                            <input type="hidden" name="BoilSteps.__new__.__extra" value="{}">
+                            <select class="form-control form-control-sm" name="BoilSteps.__new__.Location">
+                                {% for code, label in location_options %}
+                                <option value="{{ code }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="BoilSteps.__new__.Temp" value="200"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="BoilSteps.__new__.Time" value="0"></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
                 <hr/>
                 <p class="small text-muted text-center">Hops</p>
-                <table class="table table-sm">
+                <input type="hidden" name="Hops.__present" value="1">
+                <table class="table table-sm" id="table-Hops" data-recipe-table="Hops">
                     <thead>
                         <tr>
                             <th>Type</th>
                             <th>Amount (oz)</th>
                             <th>AA%</th>
                             <th>Time (m)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for h in recipe['Hops'] %}
-                        <tr>
-                            <td>{{ h['Name'] }}</td>
-                            <td>{{ h['Amount'] }}</td>
-                            <td>{{ "%.1f" | format(h['Alpha'] | float) }}</td>
-                            <td>{{ "%.0f" | format(h['Time'] | float) }}</td>
+                        <tr data-recipe-row>
+                            <td><input type="hidden" name="Hops.{{ loop.index0 }}.__extra" value="{{ h | tojson | forceescape }}"><input type="text" class="form-control form-control-sm" name="Hops.{{ loop.index0 }}.Name" value="{{ h['Name'] }}"></td>
+                            <td><input type="number" step="0.01" class="form-control form-control-sm" name="Hops.{{ loop.index0 }}.Amount" value="{{ h['Amount'] }}"></td>
+                            <td><input type="number" step="0.1" class="form-control form-control-sm" name="Hops.{{ loop.index0 }}.Alpha" value="{{ '%.1f' | format(h['Alpha'] | float) }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="Hops.{{ loop.index0 }}.Time" value="{{ '%.0f' | format(h['Time'] | float) }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('Hops', 5) }}
                     </tbody>
                 </table>
+                <template id="row-template-Hops">
+                    <tr data-recipe-row>
+                        <td><input type="hidden" name="Hops.__new__.__extra" value="{}"><input type="text" class="form-control form-control-sm" name="Hops.__new__.Name" value=""></td>
+                        <td><input type="number" step="0.01" class="form-control form-control-sm" name="Hops.__new__.Amount" value="0"></td>
+                        <td><input type="number" step="0.1" class="form-control form-control-sm" name="Hops.__new__.Alpha" value="0"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="Hops.__new__.Time" value="0"></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
                 <hr/>
                 <p class="small text-muted text-center">Other Boil Ingredients</p>
                 #TODO: This
             </div>
         </div>
         <hr>
-        {% if recipe['WhirlpoolSteps']|length > 0 %}
         <h3 class="card-header-custom mb-3 pl-3 stats-box">WHIRLPOOL</h3>
         <div class="row mb-3">
             <div class="col-12">
@@ -226,53 +305,91 @@
         <div class="row justify-content-center">
             <div class="col-10">
                 <p class="small text-muted text-center">Whirlpool Steps</p>
-                <table class="table table-sm">
+                <input type="hidden" name="WhirlpoolSteps.__present" value="1">
+                <table class="table table-sm" id="table-WhirlpoolSteps" data-recipe-table="WhirlpoolSteps">
                     <thead>
                         <tr>
                             <th>Location</th>
                             <th>Temp (°F)</th>
                             <th>Whirlpool Time (m)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for h in recipe['WhirlpoolSteps'] %}
-                        <tr>
-                            <td>{{ h['Location'] }}</td>
-                            <td>{{ h['Temp'] }}</td>
-                            <td>{{ h['Time'] }}</td>
+                        <tr data-recipe-row>
+                            <td>
+                                <input type="hidden" name="WhirlpoolSteps.{{ loop.index0 }}.__extra" value="{{ h | tojson | forceescape }}">
+                                <select class="form-control form-control-sm" name="WhirlpoolSteps.{{ loop.index0 }}.Location">
+                                    {% for code, label in location_options %}
+                                    <option value="{{ code }}" {{ 'selected' if code == (h['Location']|string) }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="WhirlpoolSteps.{{ loop.index0 }}.Temp" value="{{ h['Temp'] }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="WhirlpoolSteps.{{ loop.index0 }}.Time" value="{{ h['Time'] }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('WhirlpoolSteps', 4) }}
                     </tbody>
                 </table>
+                <template id="row-template-WhirlpoolSteps">
+                    <tr data-recipe-row>
+                        <td>
+                            <input type="hidden" name="WhirlpoolSteps.__new__.__extra" value="{}">
+                            <select class="form-control form-control-sm" name="WhirlpoolSteps.__new__.Location">
+                                {% for code, label in location_options %}
+                                <option value="{{ code }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="WhirlpoolSteps.__new__.Temp" value="180"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="WhirlpoolSteps.__new__.Time" value="0"></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
                 <hr/>
                 <p class="small text-muted text-center">Hops</p>
-                <table class="table table-sm">
+                <input type="hidden" name="WhirlpoolHops.__present" value="1">
+                <table class="table table-sm" id="table-WhirlpoolHops" data-recipe-table="WhirlpoolHops">
                     <thead>
                         <tr>
                             <th>Type</th>
                             <th>Amount (oz)</th>
                             <th>AA%</th>
                             <th>Time (m)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for h in recipe['WhirlpoolHops'] %}
-                        <tr>
-                            <td>{{ h['Name'] }}</td>
-                            <td>{{ h['Amount'] }}</td>
-                            <td>{{ "%.1f" | format(h['Alpha'] | float) }}</td>
-                            <td>{{ "%.0f" | format(h['Time'] | float) }}</td>
+                        <tr data-recipe-row>
+                            <td><input type="hidden" name="WhirlpoolHops.{{ loop.index0 }}.__extra" value="{{ h | tojson | forceescape }}"><input type="text" class="form-control form-control-sm" name="WhirlpoolHops.{{ loop.index0 }}.Name" value="{{ h['Name'] }}"></td>
+                            <td><input type="number" step="0.01" class="form-control form-control-sm" name="WhirlpoolHops.{{ loop.index0 }}.Amount" value="{{ h['Amount'] }}"></td>
+                            <td><input type="number" step="0.1" class="form-control form-control-sm" name="WhirlpoolHops.{{ loop.index0 }}.Alpha" value="{{ '%.1f' | format(h['Alpha'] | float) }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="WhirlpoolHops.{{ loop.index0 }}.Time" value="{{ '%.0f' | format(h['Time'] | float) }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('WhirlpoolHops', 5) }}
                     </tbody>
                 </table>
+                <template id="row-template-WhirlpoolHops">
+                    <tr data-recipe-row>
+                        <td><input type="hidden" name="WhirlpoolHops.__new__.__extra" value="{}"><input type="text" class="form-control form-control-sm" name="WhirlpoolHops.__new__.Name" value=""></td>
+                        <td><input type="number" step="0.01" class="form-control form-control-sm" name="WhirlpoolHops.__new__.Amount" value="0"></td>
+                        <td><input type="number" step="0.1" class="form-control form-control-sm" name="WhirlpoolHops.__new__.Alpha" value="0"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="WhirlpoolHops.__new__.Time" value="0"></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
                 <hr/>
                 <p class="small text-muted text-center">Other Whirlpool Ingredients</p>
                 #TODO: This
             </div>
         </div>
         <hr>
-        {% endif %}
         <h3 class="card-header-custom mb-3 pl-3 stats-box">FERMENTATION</h3>
         <div class="row mb-3">
             <div class="col-12">
@@ -293,57 +410,88 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td>{{ recipe['Yeast']['Name'] }}</td>
-                            <td>{{ recipe['Yeast']['ExpectedAtten'] }}</td>
-                            <td>{{ recipe['Yeast']['MinTemp'] }} - {{ recipe['Yeast']['MaxTemp'] }}</td>
-                            <td>{{ recipe['Yeast']['ExpectedTemp'] }}</td>
+                            <td><input type="text" class="form-control form-control-sm" name="Yeast.Name" value="{{ recipe['Yeast']['Name'] }}"></td>
+                            <td><input type="number" step="0.1" class="form-control form-control-sm" name="Yeast.ExpectedAtten" value="{{ recipe['Yeast']['ExpectedAtten'] }}"></td>
+                            <td>
+                                <div class="d-flex">
+                                    <input type="number" step="1" class="form-control form-control-sm me-1" name="Yeast.MinTemp" value="{{ recipe['Yeast']['MinTemp'] }}">
+                                    <input type="number" step="1" class="form-control form-control-sm" name="Yeast.MaxTemp" value="{{ recipe['Yeast']['MaxTemp'] }}">
+                                </div>
+                            </td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="Yeast.ExpectedTemp" value="{{ recipe['Yeast']['ExpectedTemp'] }}"></td>
                         </tr>
                     </tbody>
                 </table>
                 <hr/>
                 <p class="small text-muted text-center">Fermentation Steps</p>
-                <table class="table table-sm">
+                <input type="hidden" name="FermentationSteps.__present" value="1">
+                <table class="table table-sm" id="table-FermentationSteps" data-recipe-table="FermentationSteps">
                     <thead>
                         <tr>
                             <th>Step</th>
                             <th>Temp (°F)</th>
                             <th>Days</th>
                             <th>Hours</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for s in recipe['FermentationSteps'] %}
-                        <tr>
-                            <td>{{ s['Name'] }}</td>
-                            <td>{{ s['Temp'] }}</td>
-                            <td>{{ "%.1f" | format(s['Days'] | float) }}</td>
-                            <td>{{ "%.1f" | format(s['Hours'] | float) }}</td>
+                        <tr data-recipe-row>
+                            <td><input type="hidden" name="FermentationSteps.{{ loop.index0 }}.__extra" value="{{ s | tojson | forceescape }}"><input type="text" class="form-control form-control-sm" name="FermentationSteps.{{ loop.index0 }}.Name" value="{{ s['Name'] }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="FermentationSteps.{{ loop.index0 }}.Temp" value="{{ s['Temp'] }}"></td>
+                            <td><input type="number" step="0.1" class="form-control form-control-sm" name="FermentationSteps.{{ loop.index0 }}.Days" value="{{ '%.1f' | format(s['Days'] | float) }}"></td>
+                            <td><input type="number" step="0.1" class="form-control form-control-sm" name="FermentationSteps.{{ loop.index0 }}.Hours" value="{{ '%.1f' | format(s['Hours'] | float) }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('FermentationSteps', 5) }}
                     </tbody>
                 </table>
+                <template id="row-template-FermentationSteps">
+                    <tr data-recipe-row>
+                        <td><input type="hidden" name="FermentationSteps.__new__.__extra" value="{}"><input type="text" class="form-control form-control-sm" name="FermentationSteps.__new__.Name" value="New Step"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="FermentationSteps.__new__.Temp" value="65"></td>
+                        <td><input type="number" step="0.1" class="form-control form-control-sm" name="FermentationSteps.__new__.Days" value="0"></td>
+                        <td><input type="number" step="0.1" class="form-control form-control-sm" name="FermentationSteps.__new__.Hours" value="0"></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
                 <hr/>
                 <p class="small text-muted text-center">Dry Hops</p>
-                <table class="table table-sm">
+                <input type="hidden" name="DryHops.__present" value="1">
+                <table class="table table-sm" id="table-DryHops" data-recipe-table="DryHops">
                     <thead>
                         <tr>
                             <th>Type</th>
                             <th>Amount (oz)</th>
                             <th>AA%</th>
                             <th>Time (m)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for h in recipe['DryHops'] %}
-                        <tr>
-                            <td>{{ h['Name'] }}</td>
-                            <td>{{ h['Amount'] }}</td>
-                            <td>{{ "%.1f" | format(h['Alpha'] | float) }}</td>
-                            <td>{{ ("%.0f" | format(h['Time'] | float)) if (h['Time'] > 0) else ('N/A') }}</td>
+                        <tr data-recipe-row>
+                            <td><input type="hidden" name="DryHops.{{ loop.index0 }}.__extra" value="{{ h | tojson | forceescape }}"><input type="text" class="form-control form-control-sm" name="DryHops.{{ loop.index0 }}.Name" value="{{ h['Name'] }}"></td>
+                            <td><input type="number" step="0.01" class="form-control form-control-sm" name="DryHops.{{ loop.index0 }}.Amount" value="{{ h['Amount'] }}"></td>
+                            <td><input type="number" step="0.1" class="form-control form-control-sm" name="DryHops.{{ loop.index0 }}.Alpha" value="{{ '%.1f' | format(h['Alpha'] | float) }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="DryHops.{{ loop.index0 }}.Time" value="{{ '%.0f' | format(h['Time'] | float) }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('DryHops', 5) }}
                     </tbody>
                 </table>
+                <template id="row-template-DryHops">
+                    <tr data-recipe-row>
+                        <td><input type="hidden" name="DryHops.__new__.__extra" value="{}"><input type="text" class="form-control form-control-sm" name="DryHops.__new__.Name" value=""></td>
+                        <td><input type="number" step="0.01" class="form-control form-control-sm" name="DryHops.__new__.Amount" value="0"></td>
+                        <td><input type="number" step="0.1" class="form-control form-control-sm" name="DryHops.__new__.Alpha" value="0"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="DryHops.__new__.Time" value="0"></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
                 <hr/>
                 <p class="small text-muted text-center">Fermentation Additions</p>
                 #TODO: This
@@ -354,95 +502,17 @@
         <div class="row justify-content-center">
             <div class="col-10">
                 <p class="small text-muted text-center">Brewing Instructions:</p>
-                <ol>
-                    {% if recipe['HumanBrewingSteps']['FillKeg'] != "" %}
-                    <li>{{ recipe['HumanBrewingSteps']['FillKeg'] }}</li>
-                    {% endif %}
-                    {% if recipe['HumanBrewingSteps']['LoadMash'] != "" %}
-                    <li>
-                        {{ recipe['HumanBrewingSteps']['LoadMash'] }}
-                        <ul>
-                        {% for m in recipe['HumanBrewingSteps']['Mash'] %}
-                            <li>{{ m['Amount'] }} {{ m['Units'] }} of {{ m['Name'] }}</li>
-                        {% endfor %}
-                        </ul>
-                    </li>
-                    {% endif %}
-                    {% if recipe['HumanBrewingSteps']['AdjunctRounds']|length > 0 %}
-                    {% for r in recipe['HumanBrewingSteps']['AdjunctRounds'] %}
-                    <li>
-                        {{ recipe['HumanBrewingSteps']['LoadAdjuncts'] }}
-                        <ol>
-                            {% if r['Adjuncts1']|length > 0 %}
-                            <li>
-                                Load the following ingredients in Adjunct 1
-                                <ul>
-                                    {% for i in r['Adjuncts1'] %}
-                                    <li>{{ i['Amount'] }} {{ i['Units'] }} of {{ i['Name'] }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </li>
-                            {% endif %}
-                            {% if r['Adjuncts2']|length > 0 %}
-                            <li>
-                                Load the following ingredients in Adjunct 2
-                                <ul>
-                                    {% for i in r['Adjuncts2'] %}
-                                    <li>{{ i['Amount'] }} {{ i['Units'] }} of {{ i['Name'] }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </li>
-                            {% endif %}
-                            {% if r['Adjuncts3']|length > 0 %}
-                            <li>
-                                Load the following ingredients in Adjunct 3
-                                <ul>
-                                    {% for i in r['Adjuncts3'] %}
-                                    <li>{{ i['Amount'] }} {{ i['Units'] }} of {{ i['Name'] }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </li>
-                            {% endif %}
-                            {% if r['Adjuncts4']|length > 0 %}
-                            <li>
-                                Load the following ingredients in Adjunct 4
-                                <ul>
-                                    {% for i in r['Adjuncts4'] %}
-                                    <li>{{ i['Amount'] }} {{ i['Units'] }} of {{ i['Name'] }}</li>
-                                    {% endfor %}
-                                </ul>
-                            </li>
-                            {% endif %}
-                        </ol>
-                    </li>
-                    {% endfor %}
-                    {% endif %}
-                </ol>
+                <textarea class="form-control form-control-sm" name="BrewingInstructionsText" rows="10">{{ recipe['BrewingInstructionsText'] }}</textarea>
                 <hr/>
                 <p class="small text-muted text-center">Fermentation Instructions:</p>
-                <ol>
-                    <li>Cool to {{ recipe['FermentationSteps'][0]['Temp'] }}°F</li> <!--#TODO: Hardcoded Index: 0-->
-                    <li>Pitch Yeast</li>
-                    {% if recipe['HumanBrewingSteps']['LoadFermentationAdditions'] != "" %}
-                    <li>
-                        {{ recipe['HumanBrewingSteps']['LoadFermentationAdditions'] }}
-                        <ul>
-                        {% for fa in recipe['HumanBrewingSteps']['FermentationAdditions'] %}
-                            <li>{{ fa['Amount'] }} {{ fa['Units'] }} of {{ fa['Name'] }}</li>
-                        {% endfor %}
-                        </ul>
-                    </li>
-                    {% endif %}
-                    <li>Keep temperature consistent for {{ "%.1f" | format(recipe['FermentationSteps'][0]['Days'] | float) }} Days</li> <!--#TODO: Hardcoded Index: 0-->
-                </ol>
+                <textarea class="form-control form-control-sm" name="FermentationInstructionsText" rows="6">{{ recipe['FermentationInstructionsText'] }}</textarea>
                 <hr/>
                 <p class="small text-muted text-center">Special Brewing Instructions:</p>
-                {% if recipe['SpecialBrewingInstructions'] != "" %}
-                {{ recipe['SpecialBrewingInstructions'] }}
-                {% endif %}
+                <textarea class="form-control form-control-sm" name="SpecialBrewingInstructions" rows="4">{{ recipe['SpecialBrewingInstructions'] }}</textarea>
                 <hr/>
                 <p class="small text-muted text-center">Machine Steps:</p>
-                <table class="table table-sm">
+                <input type="hidden" name="MachineSteps.__present" value="1">
+                <table class="table table-sm" id="table-MachineSteps" data-recipe-table="MachineSteps">
                     <thead>
                         <tr>
                             <th>Name</th>
@@ -450,20 +520,45 @@
                             <th>Temp (°F)</th>
                             <th>Time (m)</th>
                             <th>Drain (m)</th>
+                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for s in recipe['MachineSteps'] %}
-                        <tr>
-                            <td>{{ s['Name'] }}</td>
-                            <td>{{ s['StepLocation'] }}</td>
-                            <td>{{ s['Temperature'] }}</td>
-                            <td>{{ s['Time'] }}</td>
-                            <td>{{ s['Drain'] }}</td>
+                        <tr data-recipe-row>
+                            <td><input type="hidden" name="MachineSteps.{{ loop.index0 }}.__extra" value="{{ s | tojson | forceescape }}"><input type="text" class="form-control form-control-sm" name="MachineSteps.{{ loop.index0 }}.Name" value="{{ s['Name'] }}"></td>
+                            <td>
+                                <select class="form-control form-control-sm" name="MachineSteps.{{ loop.index0 }}.StepLocation">
+                                    {% for code, label in location_options %}
+                                    <option value="{{ code }}" {{ 'selected' if code == (s['StepLocation']|string) }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="MachineSteps.{{ loop.index0 }}.Temperature" value="{{ s['Temperature'] }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="MachineSteps.{{ loop.index0 }}.Time" value="{{ s['Time'] }}"></td>
+                            <td><input type="number" step="1" class="form-control form-control-sm" name="MachineSteps.{{ loop.index0 }}.Drain" value="{{ s['Drain'] }}"></td>
+                            {{ row_actions() }}
                         </tr>
                         {% endfor %}
+                        {{ add_row_row('MachineSteps', 6) }}
                     </tbody>
                 </table>
+                <template id="row-template-MachineSteps">
+                    <tr data-recipe-row>
+                        <td><input type="hidden" name="MachineSteps.__new__.__extra" value="{}"><input type="text" class="form-control form-control-sm" name="MachineSteps.__new__.Name" value="New Step"></td>
+                        <td>
+                            <select class="form-control form-control-sm" name="MachineSteps.__new__.StepLocation">
+                                {% for code, label in location_options %}
+                                <option value="{{ code }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="MachineSteps.__new__.Temperature" value="70"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="MachineSteps.__new__.Time" value="0"></td>
+                        <td><input type="number" step="1" class="form-control form-control-sm" name="MachineSteps.__new__.Drain" value="0"></td>
+                        {{ row_actions() }}
+                    </tr>
+                </template>
             </div>
         </div>
     </div>

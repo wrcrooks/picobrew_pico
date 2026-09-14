@@ -3,7 +3,7 @@ import os
 import uuid
 from datetime import timedelta, datetime
 from markupsafe import escape
-from flask import current_app, make_response, request, send_file, render_template
+from flask import current_app, make_response, request, send_file, render_template, redirect
 from pathlib import Path
 from ruamel.yaml import YAML
 from webargs import fields
@@ -426,8 +426,6 @@ def load_ingredients():
         ingredients = None
         with open(filepath) as f:
             ingredients = json.load(f)
-            for i in [ingredients['Fermentables'], ingredients['Hops'], ingredients['Yeast'], ingredients['WaterAmendments']]:
-                print(i + '\n')
             return ingredients
     except Exception as e:
         current_app.logger.error("ERROR: An exception occurred parsing ingredients {}".format(filepath))
@@ -556,14 +554,56 @@ def _recipe(args):
                 recipe['MachineSteps'][s]['StepLocation'] = k.replace("Adjunct", "Adjunct ").replace("PassThru", "Pass Through")
     return render_template_with_defaults('recipe_viewer.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData)
 
+def build_default_brewing_instructions(recipe):
+    human = recipe.get('HumanBrewingSteps') or {}
+    lines = []
+    if human.get('FillKeg'):
+        lines.append(human['FillKeg'])
+    if human.get('LoadMash'):
+        lines.append(human['LoadMash'])
+        for m in human.get('Mash', []):
+            lines.append('- {} {} of {}'.format(m['Amount'], m['Units'], m['Name']))
+    for round_ in human.get('AdjunctRounds', []):
+        if human.get('LoadAdjuncts'):
+            lines.append(human['LoadAdjuncts'])
+        for n in range(1, 5):
+            adjuncts = round_.get(f'Adjuncts{n}', [])
+            if adjuncts:
+                lines.append(f'- Load the following ingredients in Adjunct {n}')
+                for i in adjuncts:
+                    lines.append('  - {} {} of {}'.format(i['Amount'], i['Units'], i['Name']))
+    return '\n'.join(lines)
+
+
+def build_default_fermentation_instructions(recipe):
+    steps = recipe.get('FermentationSteps') or []
+    human = recipe.get('HumanBrewingSteps') or {}
+    lines = []
+    if steps:
+        lines.append('Cool to {}°F'.format(steps[0]['Temp']))
+    lines.append('Pitch Yeast')
+    if human.get('LoadFermentationAdditions'):
+        lines.append(human['LoadFermentationAdditions'])
+        for fa in human.get('FermentationAdditions', []):
+            lines.append('- {} {} of {}'.format(fa['Amount'], fa['Units'], fa['Name']))
+    if steps:
+        lines.append('Keep temperature consistent for {:.1f} Days'.format(steps[0]['Days']))
+    return '\n'.join(lines)
+
+
 @main.route('/recipe/edit/<rfid>', methods=['GET', 'POST'])
 def _recipe_edit(rfid):
     global redux_recipes, invalid_recipes
     redux_recipes = load_redux_recipes()
-    recipe = new_zymatic_recipe()
-    for r in redux_recipes:
-        if r.id == rfid:
-            recipe = json.loads(json.dumps(r, default=lambda r: r.__dict__))
+    recipe_obj = next((r for r in redux_recipes if r.id == rfid), None)
+
+    if request.method == 'POST':
+        if recipe_obj is None:
+            return 'Recipe not found', 404
+        recipe_obj.update_from_form(request.form)
+        return redirect(f'/recipe/edit/{recipe_obj.id}')
+
+    recipe = json.loads(json.dumps(recipe_obj, default=lambda r: r.__dict__)) if recipe_obj else new_zymatic_recipe()
     GB_labels = [f['Name'] for f in recipe['Fermentables']]
     GB_amounts = [f['Amount'] for f in recipe['Fermentables']]
     GRAIN_BILL_DATA = {
@@ -578,23 +618,19 @@ def _recipe_edit(rfid):
     for s in recipe['MachineSteps']:
         for m in range(s['Time']):
             wortCurveData.append(int(s['Temperature']))
-    for s in range(len(recipe['Hops'])):
-        for k in ZSERIES_LOCATION.keys():
-            if ZSERIES_LOCATION[k] == str(recipe['Hops'][s]['Location']):
-                recipe['Hops'][s]['Location'] = k.replace("Adjunct", "Adjunct ")
-    for s in range(len(recipe['BoilSteps'])):
-        for k in ZSERIES_LOCATION.keys():
-            if ZSERIES_LOCATION[k] == str(recipe['BoilSteps'][s]['Location']):
-                recipe['BoilSteps'][s]['Location'] = k.replace("Adjunct", "Adjunct ")
-    for s in range(len(recipe['WhirlpoolSteps'])):
-        for k in ZSERIES_LOCATION.keys():
-            if ZSERIES_LOCATION[k] == str(recipe['WhirlpoolSteps'][s]['Location']):
-                recipe['WhirlpoolSteps'][s]['Location'] = k.replace("Adjunct", "Adjunct ")
-    for s in range(len(recipe['MachineSteps'])):
-        for k in ZSERIES_LOCATION.keys():
-            if ZSERIES_LOCATION[k] == str(recipe['MachineSteps'][s]['StepLocation']):
-                recipe['MachineSteps'][s]['StepLocation'] = k.replace("Adjunct", "Adjunct ").replace("PassThru", "Pass Through")
-    return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, bjcp_2008_substyles=bjcp_2008_substyles)
+    # Boil/Whirlpool Steps and Machine Steps location is left as its raw ZSERIES_LOCATION
+    # code (not converted to a display string) so the editable <select> in
+    # recipe_editor.html can mark the right option selected.
+
+    if not recipe.get('BrewingInstructionsText'):
+        recipe['BrewingInstructionsText'] = build_default_brewing_instructions(recipe)
+    if not recipe.get('FermentationInstructionsText'):
+        recipe['FermentationInstructionsText'] = build_default_fermentation_instructions(recipe)
+
+    location_options = [(v, k.replace('Adjunct', 'Adjunct ').replace('PassThru', 'Pass Through'))
+                         for k, v in ZSERIES_LOCATION.items()]
+
+    return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, bjcp_2008_substyles=bjcp_2008_substyles, location_options=location_options)
 
 @main.route('/api/modifyRecipe', methods=['POST'])
 def _api_modifyRecipe():
@@ -622,7 +658,7 @@ def _recipe_delete(rfid):
 @main.route('/ingredients')
 def _ingredients():
     global ingredients
-    ingredients = load_ingredients()
+    ingredients = load_ingredients() or {'Fermentables': [], 'Hops': [], 'Yeast': [], 'WaterAmendments': []}
     for f in ingredients['Fermentables']:
         # LOVIBOND_COLOR_DATA
         for c in LOVIBOND_COLOR_DATA:

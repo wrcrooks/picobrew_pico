@@ -416,11 +416,19 @@ class ReduxRecipe():
         self.is_archived = False
         self.image = None
         self.steps = []
+        self.BrewingInstructionsText = None
+        self.FermentationInstructionsText = None
+        self._raw = None
+        self.filepath = None
 
     def parse(self, file):
         recipe = None
         with open(file) as f:
             recipe = json.load(f)
+        self._raw = recipe
+        self.filepath = str(file)
+        self.BrewingInstructionsText = recipe['VM']['Recipe'].get('BrewingInstructionsText', None)
+        self.FermentationInstructionsText = recipe['VM']['Recipe'].get('FermentationInstructionsText', None)
         self.id = recipe.get('RecipeGUID', 'XXXXXXXXXXXXXX') or 'XXXXXXXXXXXXXX'
         self.name = recipe['VM']['Recipe']['Name'] or 'Empty Recipe'
         self.name_ = self.name.replace(" ", "_").replace("\'", "")
@@ -471,3 +479,98 @@ class ReduxRecipe():
         #         step.step_time = 0 if 'step_time' not in recipe_step else int(recipe_step['step_time'])
         #         step.drain_time = 0 if 'drain_time' not in recipe_step else int(recipe_step['drain_time'])
         #         self.steps.append(step)
+
+    def update_from_form(self, form):
+        """Apply edits posted from recipe_editor.html onto the original raw recipe
+        JSON (self._raw) and write it back to disk. Mutating the raw dict in place
+        (rather than reconstructing it from the flattened attributes) preserves any
+        fields the editor doesn't expose."""
+        def to_float(value, default):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return default
+
+        def to_int(value, default):
+            try:
+                return int(float(value))
+            except (TypeError, ValueError):
+                return default
+
+        def rebuild_rows(table_key, field_casts):
+            """Reconstruct a table's row list purely from submitted form data, so
+            rows added/removed/reordered client-side (recipe_editor.js) come back
+            exactly as the browser sent them -- there's no assumption the row count
+            or order matches the original data. Each row's fields the editor doesn't
+            expose ride along in a hidden '<table>.<i>.__extra' JSON blob (the row's
+            original data, or '{}' for a brand-new row) so they survive a save even
+            though only the visibly-editable fields are posted individually.
+
+            If the table's '<table>.__present' marker is missing entirely -- a
+            partial/malformed POST, not a real page submission -- leave the table
+            untouched rather than silently wiping it to an empty list."""
+            if f'{table_key}.__present' not in form:
+                return r.get(table_key, [])
+            rows = []
+            i = 0
+            while f'{table_key}.{i}.__extra' in form:
+                try:
+                    row = json.loads(form.get(f'{table_key}.{i}.__extra') or '{}')
+                    if not isinstance(row, dict):
+                        row = {}
+                except ValueError:
+                    row = {}
+                for field, cast in field_casts.items():
+                    posted = form.get(f'{table_key}.{i}.{field}')
+                    if posted is None:
+                        continue
+                    row[field] = cast(posted, row.get(field)) if cast else posted
+                rows.append(row)
+                i += 1
+            return rows
+
+        r = self._raw['VM']['Recipe']
+        content = self._raw['VM']['Content']
+
+        new_name = form.get('Name', '').strip() or r.get('Name') or 'Empty Recipe'
+        r['Name'] = new_name
+        r['BeerStyle']['StyleNameCode'] = form.get('StyleNameCode', r['BeerStyle'].get('StyleNameCode'))
+        r['TastingNotes'] = form.get('TastingNotes', r.get('TastingNotes', ''))
+        r['BrewingInstructionsText'] = form.get('BrewingInstructionsText', r.get('BrewingInstructionsText', ''))
+        r['FermentationInstructionsText'] = form.get('FermentationInstructionsText', r.get('FermentationInstructionsText', ''))
+        content['SpecialBrewingInstructions'] = form.get('SpecialBrewingInstructions', content.get('SpecialBrewingInstructions', ''))
+
+        r['MashSteps'] = rebuild_rows('MashSteps', {'Name': None, 'Temp': to_float, 'Time': to_float})
+        r['Fermentables'] = rebuild_rows('Fermentables', {'Name': None, 'Amount': to_float, 'ColorPts': to_float})
+        r['BoilSteps'] = rebuild_rows('BoilSteps', {'Location': to_int, 'Temp': to_float, 'Time': to_float})
+        r['Hops'] = rebuild_rows('Hops', {'Name': None, 'Amount': to_float, 'Alpha': to_float, 'Time': to_float})
+        r['WhirlpoolSteps'] = rebuild_rows('WhirlpoolSteps', {'Location': to_int, 'Temp': to_float, 'Time': to_float})
+        r['WhirlpoolHops'] = rebuild_rows('WhirlpoolHops', {'Name': None, 'Amount': to_float, 'Alpha': to_float, 'Time': to_float})
+        r['DryHops'] = rebuild_rows('DryHops', {'Name': None, 'Amount': to_float, 'Alpha': to_float, 'Time': to_float})
+        r['Amendments'] = rebuild_rows('Amendments', {'Name': None, 'Amount': to_float, 'Units': None})
+        r['FermentationSteps'] = rebuild_rows('FermentationSteps', {'Name': None, 'Temp': to_float, 'Days': to_float, 'Hours': to_float})
+        # Temperature/Time/Drain must stay ints: routes_frontend.py builds the wort curve
+        # via range(s['Time']), which raises TypeError on a float.
+        r['MachineSteps'] = rebuild_rows('MachineSteps', {'Name': None, 'StepLocation': to_int,
+                                                           'Temperature': to_int, 'Time': to_int, 'Drain': to_int})
+
+        if r.get('Yeast'):
+            y = r['Yeast']
+            y['Name'] = form.get('Yeast.Name', y.get('Name'))
+            y['ExpectedAtten'] = to_float(form.get('Yeast.ExpectedAtten'), y.get('ExpectedAtten'))
+            y['MinTemp'] = to_float(form.get('Yeast.MinTemp'), y.get('MinTemp'))
+            y['MaxTemp'] = to_float(form.get('Yeast.MaxTemp'), y.get('MaxTemp'))
+            y['ExpectedTemp'] = to_float(form.get('Yeast.ExpectedTemp'), y.get('ExpectedTemp'))
+
+        filename = self.filepath
+        if new_name != self.name:
+            new_filename = str(recipe_path(MachineType.UNIFIED, self.is_archived).joinpath(
+                '{}.json'.format(new_name.strip().replace(' ', '_').replace("'", ""))))
+            os.rename(filename, new_filename)
+            filename = new_filename
+            self.filepath = filename
+
+        with open(filename, 'w') as out:
+            json.dump(self._raw, out, indent=4, sort_keys=True)
+
+        self.name = new_name
