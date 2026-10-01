@@ -17,6 +17,7 @@ from .config import (MachineType, SessionType, recipe_path,
                      brew_archive_sessions_path, ferm_archive_sessions_path, still_archive_sessions_path, iSpindel_archive_sessions_path, tilt_archive_sessions_path)
 from .frontend_common import render_template_with_defaults
 from .recipe_import import import_recipes
+from .recipe_conditions import condition_charts
 from .recipe_parser import PicoBrewRecipe, ZymaticRecipe, ZSeriesRecipe, ReduxRecipe
 from .session_parser import (_paginate_sessions, list_session_files,
                              load_ferm_session, load_still_session, load_iSpindel_session, load_tilt_session,
@@ -559,6 +560,7 @@ def _recipe(args):
         for m in range(s['Time']):
             wortCurveData.append(int(s['Temperature']))
     derived = recipe_derived_values(recipe)
+    derived['condition_data'] = condition_charts(recipe)
     fill_default_instructions(recipe)
     for s in range(len(recipe['Hops'])):
         for k in ZSERIES_LOCATION.keys():

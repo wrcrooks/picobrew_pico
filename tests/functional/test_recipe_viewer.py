@@ -83,6 +83,17 @@ def test_viewer_other_ingredient_tables(viewer):
     assert '<b>Whirlpool Time (m):</b> 20' in page
 
 
+def test_viewer_condition_charts(viewer):
+    get_page, _ = viewer
+    page = get_page()
+    for stat in ['OG', 'FG', 'IBU', 'SRM', 'ABV']:
+        assert f'id="cond-chart-{stat}"' in page
+    raw = page.split('<script id="condition-data" type="application/json">')[1].split('</script>')[0]
+    data = json.loads(raw)
+    assert [c['key'] for c in data['conditions']] == ['efficiency', 'volume', 'attenuation']
+    assert 'Style range (Irish Red Ale)' in page
+
+
 def test_viewer_without_fermentation_steps(viewer):
     get_page, write_recipe = viewer
     write_recipe(lambda r: r.update(FermentationSteps=[]))

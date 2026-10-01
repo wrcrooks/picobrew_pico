@@ -128,6 +128,43 @@
             </div>
         </div>
         <hr>
+        <h3 class="card-header-custom mb-3 pl-3 stats-box">STATS UNDER DIFFERENT BREWING CONDITIONS</h3>
+        <div id="cond-root" class="cond-root mb-4">
+            <div class="cond-controls">
+                <span class="cond-control-label" id="cond-vary-label">Vary</span>
+                <div class="btn-group btn-group-sm" role="group" aria-labelledby="cond-vary-label">
+                    {% for c in condition_data['conditions'] %}
+                    <button type="button" class="btn btn-outline-secondary" data-cond="{{ c['key'] }}" aria-pressed="false">{{ c['label'] }}</button>
+                    {% endfor %}
+                </div>
+            </div>
+            <p class="cond-description" id="cond-description"></p>
+            <div class="cond-key" aria-hidden="true">
+                <span><i class="cond-swatch-line"></i>Predicted</span>
+                <span><i class="cond-swatch-dot"></i>This recipe as written</span>
+                {% if condition_data['style_name'] %}<span><i class="cond-swatch-style"></i>Style range ({{ condition_data['style_name'] }})</span>{% endif %}
+                <span id="cond-key-yeast"><i class="cond-swatch-wash"></i>Yeast attenuation range {{ '%g' | format(condition_data['attenuation_range'][0]) }}–{{ '%g' | format(condition_data['attenuation_range'][1]) }}% (FG, ABV)</span>
+            </div>
+            <div class="cond-grid">
+                {% for stat in ['OG', 'FG', 'IBU', 'SRM', 'ABV'] %}
+                <figure class="cond-card">
+                    <figcaption>
+                        <span class="cond-stat">{{ stat }}</span>
+                        <span class="cond-value" id="cond-value-{{ stat }}"></span>
+                        <span class="cond-verdict" id="cond-verdict-{{ stat }}"></span>
+                    </figcaption>
+                    <div class="cond-canvas"><canvas id="cond-chart-{{ stat }}" role="img"></canvas></div>
+                </figure>
+                {% endfor %}
+            </div>
+            <details class="cond-table-view">
+                <summary>Show these values as a table</summary>
+                <div class="table-responsive"><table class="table table-sm" id="cond-table"></table></div>
+            </details>
+        </div>
+        <script id="condition-data" type="application/json">{{ condition_data | tojson }}</script>
+        <script src="/static/js/recipe_conditions.js"></script>
+        <hr>
         <h3 class="card-header-custom mb-3 pl-3 stats-box">WATER</h3>
         <div class="row mb-3">
             <div class="col-12">

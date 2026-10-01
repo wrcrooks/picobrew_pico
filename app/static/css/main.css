@@ -116,3 +116,42 @@ input[readonly].form-control-plaintext {
   padding-bottom: 0.5rem;
   border-bottom: 1px solid rgba(0,0,0,.125);
 }
+
+/* Recipe viewer: stats under different brewing conditions (recipe_conditions.js).
+   The recipe page is a fixed white container, so these are light-surface tokens only. */
+.cond-root {
+  --cond-surface: #ffffff;
+  --cond-text: #0b0b0b;
+  --cond-text-secondary: #52514e;
+  --cond-muted: #898781;
+  --cond-grid: #e1e0d9;
+  --cond-axis: #c3c2b7;
+  --cond-series: #2a78d6;
+  --cond-series-wash: rgba(42, 120, 214, 0.12);
+  --cond-style: #898781;
+  --cond-style-wash: rgba(137, 135, 129, 0.12);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--cond-text);
+}
+.cond-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 6px 4px; }
+.cond-controls .btn-group { flex-wrap: wrap; }
+.cond-control-label { font-size: 0.8rem; color: var(--cond-text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.cond-description { font-size: 0.9rem; color: var(--cond-text-secondary); margin: 0 0 8px 4px; min-height: 1.4em; }
+.cond-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.8rem; color: var(--cond-text-secondary); margin: 0 0 12px 4px; }
+.cond-key span { display: inline-flex; align-items: center; gap: 6px; }
+.cond-key i { display: inline-block; flex: none; }
+.cond-swatch-line { width: 16px; height: 2px; border-radius: 1px; background: var(--cond-series); }
+.cond-swatch-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cond-series); box-shadow: 0 0 0 2px var(--cond-surface), 0 0 0 3px var(--cond-grid); }
+.cond-swatch-style { width: 16px; height: 10px; background: var(--cond-style-wash); border-top: 1px solid var(--cond-style); border-bottom: 1px solid var(--cond-style); }
+.cond-swatch-wash { width: 16px; height: 10px; background: var(--cond-series-wash); }
+.cond-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 16px; }
+.cond-card { margin: 0; padding: 12px 12px 8px; border: 1px solid rgba(11, 11, 11, 0.10); border-radius: 6px; background: var(--cond-surface); min-width: 0; }
+.cond-card figcaption { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+.cond-stat { font-size: 0.8rem; font-weight: 600; color: var(--cond-text-secondary); text-transform: uppercase; }
+.cond-value { font-size: 1.15rem; font-weight: 600; color: var(--cond-text); }
+.cond-verdict { font-size: 0.8rem; color: var(--cond-muted); }
+.cond-canvas { position: relative; height: 210px; }
+.cond-table-view { margin-top: 12px; font-size: 0.85rem; }
+.cond-table-view summary { cursor: pointer; color: var(--cond-text-secondary); }
+.cond-table-view td, .cond-table-view th { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cond-nominal-row td { font-weight: 600; }

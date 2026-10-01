@@ -468,6 +468,7 @@ class ReduxRecipe():
         self.BoilTime = recipe['VM']['Recipe'].get('BoilTime') or 0
         self.WhirlpoolTemp = recipe['VM']['Recipe'].get('WhirlpoolTemp') or 0
         self.BatchSize = recipe['VM']['Recipe'].get('BatchSize') or 2.5
+        self.Efficiency = recipe['VM']['Recipe'].get('Efficiency') or None
         self.H2O = recipe['VM']['Recipe'].get('H2O') or 0
         self.FermentationType = recipe['VM']['Recipe'].get('FermentationType') or 0
         self.HumanBrewingSteps = recipe['VM']['Recipe']['HumanBrewingSteps'] or []
