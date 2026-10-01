@@ -27,3 +27,6 @@ terraform/*.tfstate*
 
 # ignore Visual Studio Code files
 .vscode
+
+# device simulator state
+simulator/data/

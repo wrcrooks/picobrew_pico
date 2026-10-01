@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PicoBrew Device Simulator</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <h1>PicoBrew Device Simulator</h1>
+  <span class="muted">Default server: <code>{{ default_server_url }}</code></span>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <h2>Devices</h2>
+    <ul id="device-list" class="device-list"></ul>
+    <p id="no-devices" class="muted" hidden>No simulated devices yet.</p>
+
+    <form id="add-device" class="card stack">
+      <h3>Add device</h3>
+      <label>Model
+        <select name="model">
+          {% for key, m in models.items() %}<option value="{{ key }}">{{ m.label }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Name <input name="name" placeholder="e.g. Kitchen Pico"></label>
+      <label>UID <input name="uid" placeholder="random 32-char if blank" maxlength="64"></label>
+      <label>Firmware <input name="firmware" placeholder="model default"></label>
+      <label>Server URL <input name="server_url" placeholder="{{ default_server_url }}"></label>
+      <button type="submit" class="primary">Add</button>
+    </form>
+  </aside>
+
+  <main id="device-view" hidden>
+    <section class="card device-header">
+      <div>
+        <h2 id="d-name"></h2>
+        <div class="muted"><span id="d-model"></span> &middot; UID <code id="d-uid"></code> &middot; FW <span id="d-fw"></span></div>
+        <div class="badges" id="d-badges"></div>
+      </div>
+      <div class="row">
+        <button id="btn-power" class="primary"></button>
+        <button data-cmd="reconnect" data-needs-power>Reconnect</button>
+        <button data-cmd="register_alias" title="Submits this device's name/UID to the server's /devices page">Register alias on server</button>
+        <button id="btn-delete" class="danger">Delete</button>
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Front panel</h3>
+        <canvas id="oled" width="128" height="64"></canvas>
+        <div class="temps">
+          <div><span class="label">Wort</span><span id="t-wort" class="big"></span></div>
+          <div><span class="label">Thermoblock</span><span id="t-therm" class="big"></span></div>
+          <div><span class="label">Time left</span><span id="t-left" class="big"></span></div>
+        </div>
+
+        <h4>PicoPak</h4>
+        <div class="row">
+          <select id="pak-select"></select>
+          <button data-cmd="refresh_paks" data-needs-power title="Re-query getAssociatedPaks">&#x21bb;</button>
+        </div>
+        <div class="row">
+          <input id="rfid-input" placeholder="or type any RFID / tag ID" maxlength="64">
+          <button id="btn-insert" data-needs-idle>Insert</button>
+          <button data-cmd="eject_pak" data-needs-idle>Eject</button>
+        </div>
+
+        <h4>Programs</h4>
+        <div class="row">
+          <button data-cmd="start_brew" data-needs-idle class="primary">Start brew</button>
+          <button data-cmd="start_deep_clean" data-needs-idle>Deep clean</button>
+          <button data-cmd="start_rinse" data-needs-idle>Rinse</button>
+        </div>
+        <div class="row">
+          <input id="sv-temp" type="number" value="135" min="80" max="208" title="Sous vide temperature (F)"> &deg;F
+          <input id="sv-min" type="number" value="90" min="1" max="2880" title="Sous vide minutes"> min
+          <button id="btn-sous-vide" data-needs-idle>Sous vide</button>
+        </div>
+
+        <h4>Run control</h4>
+        <div class="row">
+          <button data-cmd="pause" data-needs-run>Pause</button>
+          <button data-cmd="resume" data-needs-run>Resume / Continue</button>
+          <button data-cmd="skip_step" data-needs-run>Skip step</button>
+          <button data-cmd="abort" data-needs-run class="danger">Abort</button>
+        </div>
+        <div class="row">
+          <label class="inline">Speed
+            <select id="speed">
+              <option value="1">1x (real time)</option>
+              <option value="10">10x</option>
+              <option value="30">30x</option>
+              <option value="60">60x</option>
+              <option value="120">120x</option>
+              <option value="300">300x</option>
+              <option value="600">600x</option>
+            </select>
+          </label>
+        </div>
+
+        <h4>Faults &amp; firmware</h4>
+        <div class="row">
+          <input id="err-code" type="number" value="1" min="0" title="Error code">
+          <button id="btn-error" data-needs-power>Report error</button>
+          <button data-cmd="clear_error">Clear</button>
+        </div>
+        <div class="row">
+          <button data-cmd="check_firmware" data-needs-power>Check firmware</button>
+          <button data-cmd="download_firmware" data-needs-power>Download firmware</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3 id="program-title">Recipe</h3>
+        <div class="table-wrap">
+          <table class="steps">
+            <thead><tr><th>#</th><th>Step</th><th>Location</th><th>&deg;F</th><th>Time</th><th>Drain</th></tr></thead>
+            <tbody id="steps-body"></tbody>
+          </table>
+        </div>
+        <p id="steps-empty" class="muted">Insert a PicoPak or start a program.</p>
+
+        <h3>Temperature</h3>
+        <canvas id="chart" height="220"></canvas>
+        <div class="legend"><span class="sw wort"></span>Wort <span class="sw therm"></span>Thermoblock <span class="sw target"></span>Step change</div>
+
+        <h3>Settings</h3>
+        <form id="settings" class="settings">
+          <label>Name <input name="name"></label>
+          <label>Firmware <input name="firmware"></label>
+          <label>Server URL <input name="server_url"></label>
+          <button type="submit">Save</button>
+        </form>
+      </section>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h3>Device events</h3>
+        <ul id="events" class="events"></ul>
+      </section>
+      <section class="card">
+        <h3>HTTP traffic <span class="muted small">(newest first)</span></h3>
+        <div class="table-wrap traffic-wrap">
+          <table class="traffic">
+            <thead><tr><th>Time</th><th>Request</th><th>Status</th><th>ms</th><th>Response</th></tr></thead>
+            <tbody id="traffic-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <main id="empty-view" class="empty">
+    <p class="muted">Add a device on the left to get started.</p>
+  </main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

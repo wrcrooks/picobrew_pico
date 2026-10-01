@@ -1,0 +1,121 @@
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --text: #1d2330;
+  --muted: #6b7280;
+  --border: #dde1e7;
+  --grid: #e7e9ee;
+  --accent: #c76a12;
+  --accent-text: #ffffff;
+  --danger: #b42318;
+  --ok: #1b7f3b;
+  --warn: #a15c00;
+  --wort: #d97706;
+  --therm: #2563eb;
+  --target: #9ca3af;
+  --active: #fff4e6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171c;
+    --card: #1d2128;
+    --text: #e6e8eb;
+    --muted: #9aa1ab;
+    --border: #2e343d;
+    --grid: #2a2f37;
+    --accent: #e0852b;
+    --accent-text: #14171c;
+    --danger: #f97066;
+    --ok: #4ade80;
+    --warn: #fbbf24;
+    --wort: #f59e0b;
+    --therm: #60a5fa;
+    --target: #6b7280;
+    --active: #2b2418;
+  }
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.4 system-ui, -apple-system, Segoe UI, sans-serif; background: var(--bg); color: var(--text); }
+body.busy { cursor: progress; }
+h1 { font-size: 18px; margin: 0; }
+h2 { font-size: 17px; margin: 0 0 4px; }
+h3 { font-size: 14px; margin: 0 0 10px; }
+h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 16px 0 6px; }
+code, .mono { font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+
+.topbar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--card); }
+.layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; padding: 16px; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px; min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.stack label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 6px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 16px; }
+main { min-width: 0; }
+.empty { display: flex; align-items: center; justify-content: center; min-height: 200px; }
+
+input, select, button { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; max-width: 100%; }
+input[type=number] { width: 80px; }
+#rfid-input { flex: 1; min-width: 140px; }
+#pak-select { flex: 1; min-width: 160px; }
+button { cursor: pointer; background: var(--card); }
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.danger { color: var(--danger); }
+label.inline { display: flex; gap: 6px; align-items: center; }
+
+.device-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.device-item { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--card); cursor: pointer; }
+.device-item.active { border-color: var(--accent); background: var(--active); }
+.device-item .name { font-weight: 600; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.dot.on { background: var(--ok); }
+.dot.off { background: var(--target); }
+
+.device-header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.badge { font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.badge.ok { color: var(--ok); }
+.badge.off { color: var(--muted); }
+.badge.warn { color: var(--warn); }
+.badge.bad { color: var(--danger); }
+
+#oled { width: 100%; max-width: 384px; aspect-ratio: 2 / 1; image-rendering: pixelated; background: #000; border-radius: 4px; border: 6px solid #2b2b2b; display: block; }
+.temps { display: flex; flex-wrap: wrap; gap: 18px; margin: 12px 0 4px; }
+.temps div { display: flex; flex-direction: column; }
+.temps .label { font-size: 12px; color: var(--muted); }
+.temps .big { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { font-size: 12px; color: var(--muted); font-weight: 500; }
+.steps tr.done td { color: var(--muted); }
+.steps tr.current td { background: var(--active); font-weight: 600; }
+.traffic-wrap { max-height: 360px; overflow-y: auto; }
+.traffic td.mono { white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; }
+.traffic tr.bad td { color: var(--danger); }
+
+#chart { width: 100%; display: block; margin-bottom: 4px; }
+.legend { display: flex; gap: 6px 14px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+.sw { display: inline-block; width: 14px; height: 3px; margin-right: -8px; vertical-align: middle; }
+.sw.wort { background: var(--wort); }
+.sw.therm { background: var(--therm); }
+.sw.target { border-top: 2px dashed var(--target); height: 0; }
+
+.settings { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.settings label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+
+.events { list-style: none; margin: 0; padding: 0; max-height: 360px; overflow-y: auto; }
+.events li { padding: 3px 0; border-bottom: 1px solid var(--grid); }
+.events li.warn { color: var(--warn); }
+.events li.error { color: var(--danger); }
+
+.toast { position: fixed; right: 16px; bottom: 16px; max-width: min(420px, calc(100vw - 32px)); padding: 10px 14px; border-radius: 6px; background: var(--card); border: 1px solid var(--ok); color: var(--text); box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+.toast.error { border-color: var(--danger); }

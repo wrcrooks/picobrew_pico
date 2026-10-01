@@ -1,0 +1,27 @@
+# Local virtual-testing stack: the picobrew_pico server built from this checkout plus the
+# device simulator pointed at it. From the repo root:
+#   docker compose -f simulator/docker-compose.yml up --build
+# Server UI: http://localhost:8080   Simulator UI: http://localhost:8090
+services:
+  server:
+    build:
+      context: ..
+    environment:
+      PORT: 8080
+    ports:
+      - "8080:8080"
+
+  simulator:
+    build:
+      context: .
+    environment:
+      PICOBREW_SERVER_URL: http://server:8080
+    volumes:
+      - simulator-data:/data
+    ports:
+      - "8090:8090"
+    depends_on:
+      - server
+
+volumes:
+  simulator-data:
