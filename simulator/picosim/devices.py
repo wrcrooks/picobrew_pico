@@ -218,7 +218,11 @@ class PicoDevice:
         with self.lock:
             self.recipe = recipe
         if recipe is None:
-            self._note(f'PicoPak {rfid} not recognized by server', 'warn')
+            hint = ''
+            if len(rfid) == 32 and all(c in '0123456789abcdefABCDEF' for c in rfid):
+                hint = (" - that looks like a recipe's 32-character RecipeGUID; a Pico tag uses the recipe's "
+                        "14-character Tag ID (set it in the recipe editor's Tag Programming section)")
+            self._note(f'PicoPak {rfid} not recognized by server{hint}', 'warn')
         else:
             self._note(f'Loaded "{recipe.name}" ({len(recipe.steps)} steps)')
         return recipe

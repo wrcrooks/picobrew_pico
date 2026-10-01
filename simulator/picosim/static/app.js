@@ -36,7 +36,9 @@ async function command(cmd, extra = {}) {
   if (!state.selected) return;
   document.body.classList.add('busy');
   try {
-    applySnapshot(await api('POST', `/api/devices/${state.selected}/command`, { command: cmd, ...extra }));
+    const snap = await api('POST', `/api/devices/${state.selected}/command`, { command: cmd, ...extra });
+    applySnapshot(snap);
+    return snap;
   } catch (e) {
     toast(e.message);
     refreshDevice();
@@ -303,7 +305,9 @@ $('#btn-power').addEventListener('click', () => command(state.snap && state.snap
 $('#btn-insert').addEventListener('click', () => {
   const rfid = $('#rfid-input').value.trim() || $('#pak-select').value;
   if (!rfid) return toast('Choose a PicoPak or type an RFID');
-  command('insert_pak', { rfid });
+  command('insert_pak', { rfid }).then((snap) => {
+    if (snap && !snap.recipe && snap.events.length) toast(snap.events[0].text);
+  });
 });
 
 $('#btn-sous-vide').addEventListener('click', () =>

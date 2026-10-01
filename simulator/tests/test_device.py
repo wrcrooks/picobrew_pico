@@ -58,8 +58,11 @@ def test_unknown_pak(fake_server):
     d = make_device(fake_server)
     d.power_on()
     assert d.insert_pak('ffffffffffffff') is None
+    assert 'RecipeGUID' not in d.events[0]['text']
     with pytest.raises(CommandError):
         d.start_brew()
+    assert d.insert_pak('df268ba28492421cbb21eaaaeb816f5a') is None
+    assert 'RecipeGUID' in d.events[0]['text'] and 'Tag ID' in d.events[0]['text']
 
 
 def test_pause_location_waits_for_resume(fake_server):

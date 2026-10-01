@@ -310,6 +310,8 @@ def upload_file(machine_type):
             current_app.logger.error(f'invalid input : unsupported machine_type {machine_type}')
             return 'unsupported machine_type', 400
         file.save(os.path.join(dirpath, filename))
+        if machine_type in ('picobrew', 'pico'):
+            refresh_pico_recipe_cache()
         return f'upload of {file.filename} successful', 204
     else:
         return f'unsupported file : {file.filename}', 400
@@ -1289,13 +1291,23 @@ def _pico_recipes():
     return render_template_with_defaults('pico_recipes.html', recipes=recipes_dict, invalid=invalid_recipes.get(MachineType.PICOBREW, set()))
 
 
+def refresh_pico_recipe_cache():
+    """The /API/pico device endpoints serve from these cached lists, so every write to a Pico
+    recipe file must refresh them or devices keep seeing the old set until a restart."""
+    global pico_recipes
+    pico_recipes = load_pico_recipes()
+    load_active_recipes(MachineType.PICOBREW)
+
+
 @main.route('/new_pico_recipe', methods=['GET', 'POST'])
 def new_pico_recipe():
     if request.method == 'POST':
         recipe = request.get_json()
         recipe['id'] = uuid.uuid4().hex[:14]
         filename = build_recipe_filename(recipe_path(MachineType.PICOBREW), recipe['name'])
-        return write_recipe_file(filename, recipe)
+        result = write_recipe_file(filename, recipe)
+        refresh_pico_recipe_cache()
+        return result
     else:
         return render_template_with_defaults('new_pico_recipe.html')
 
@@ -1309,6 +1321,7 @@ def import_pico_recipe():
         try:
             # import for picobrew and picobrew_c are the same
             import_recipes(uid, None, rfid, MachineType.PICOBREW)
+            refresh_pico_recipe_cache()
             return '', 204
         except Exception as e:
             current_app.logger.error(f'import of picopak recipe failed: {e}')
@@ -1329,6 +1342,7 @@ def update_pico_recipe():
         recipe = load_pico_recipe(filename)
         if recipe.id == update_recipe['id']:
             recipe.update_recipe(filename, update_recipe)
+    refresh_pico_recipe_cache()
     return '', 204
 
 
@@ -1342,6 +1356,7 @@ def delete_pico_recipe():
         recipe = load_pico_recipe(filename)
         if recipe.id == recipe_id:
             os.remove(filename)
+            refresh_pico_recipe_cache()
             return '', 204
     return 'Delete Recipe: Failed to find recipe id "{recipe_id}"', 418
 
