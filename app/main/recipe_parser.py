@@ -415,6 +415,7 @@ class ReduxRecipe():
         self.is_pico = True
         self.is_archived = False
         self.image = None
+        self.TagID = None
         self.steps = []
         self.BrewingInstructionsText = None
         self.FermentationInstructionsText = None
@@ -436,7 +437,7 @@ class ReduxRecipe():
         self.abv_tweak = recipe.get('abv_tweak', -1) or -1
         self.ibu_tweak = recipe.get('ibu_tweak', -1) or -1
         self.abv = recipe['VM']['Recipe']['ABV'] or 6.0
-        self.ibu = recipe.get('ibu', 40) or 40
+        self.ibu = recipe['VM']['Recipe'].get('IBU', 40) or 40
         self.image = recipe.get('image', '') or ''
         self.is_archived = "/archive/" in str(file)
         self.author = recipe['VM']['Recipe']['Author'] or 'Unattributed'
@@ -461,13 +462,27 @@ class ReduxRecipe():
         self.Yeast = recipe['VM']['Recipe']['Yeast'] or []
         self.FermentationSteps = recipe['VM']['Recipe']['FermentationSteps'] or []
         self.DryHops = recipe['VM']['Recipe']['DryHops'] or []
+        self.Adjuncts = recipe['VM']['Recipe'].get('Adjuncts') or []
+        self.WhirlpoolAdjuncts = recipe['VM']['Recipe'].get('WhirlpoolAdjuncts') or []
+        self.DryAdjuncts = recipe['VM']['Recipe'].get('DryAdjuncts') or []
+        self.BoilTime = recipe['VM']['Recipe'].get('BoilTime') or 0
+        self.WhirlpoolTemp = recipe['VM']['Recipe'].get('WhirlpoolTemp') or 0
+        self.BatchSize = recipe['VM']['Recipe'].get('BatchSize') or 2.5
+        self.H2O = recipe['VM']['Recipe'].get('H2O') or 0
+        self.FermentationType = recipe['VM']['Recipe'].get('FermentationType') or 0
         self.HumanBrewingSteps = recipe['VM']['Recipe']['HumanBrewingSteps'] or []
         self.SpecialBrewingInstructions = recipe['VM']['Content']['SpecialBrewingInstructions'] or ""
         self.StyleNameCode = recipe['VM']['Recipe']['BeerStyle']['StyleNameCode'] or "Custom"
         try:
             self.Machine = recipe['Machine'] or "Custom"
         except Exception:
-            self.Machine = "Pico Z" #TODO: Replace this with "Custom" to signify no machine specification
+            self.Machine = "Custom"
+        # 14-character alpha-numeric tag ID -- the same format/length as a classic Pico
+        # recipe's physical PicoPak RFID (app/recipes/pico/*.json's 'id' field) -- that this
+        # recipe should be programmed onto a blank/rewritable NFC tag as, so it can be brewed
+        # on a real Pico. None until assigned in the editor; not auto-generated here since
+        # parse() must stay a pure read with no write side effects.
+        self.TagID = recipe.get('TagID') or None
         # if 'steps' in recipe:
         #     for recipe_step in recipe['steps']:
         #         step = PicoBrewRecipeStep()
@@ -479,6 +494,36 @@ class ReduxRecipe():
         #         step.step_time = 0 if 'step_time' not in recipe_step else int(recipe_step['step_time'])
         #         step.drain_time = 0 if 'drain_time' not in recipe_step else int(recipe_step['drain_time'])
         #         self.steps.append(step)
+
+    def to_legacy_pico_recipe(self):
+        """Converts this recipe into the exact wire format a real classic Pico's firmware
+        understands (what PicoBrewRecipe.serialize() produces) so a unified recipe with a
+        TagID assigned can actually be brewed via a physical NFC tag scan, not just
+        identified by the Tag Scanner tool. MachineSteps is the already-compiled, flattened
+        step sequence the Pico actually runs -- MashSteps/BoilSteps/WhirlpoolSteps etc. are
+        editor-side bookkeeping for editing/scaling, never sent to a machine -- so only it
+        needs converting. Its StepLocation codes are Z-Series numbering (ZSERIES_LOCATION);
+        the Pico numbers the same physical locations differently (PICO_LOCATION), so each
+        code is remapped via the shared location name rather than copied directly."""
+        zseries_names_by_code = {v: k for k, v in ZSERIES_LOCATION.items()}
+        pico = PicoBrewRecipe()
+        pico.id = self.TagID
+        pico.name = self.name
+        pico.abv_tweak = -1
+        pico.ibu_tweak = -1
+        pico.abv = self.abv
+        pico.ibu = self.ibu
+        pico.image = self.image or ''
+        for s in self.MachineSteps:
+            step = PicoBrewRecipeStep()
+            step.name = s.get('Name', 'Empty Step') or 'Empty Step'
+            location_name = zseries_names_by_code.get(str(s.get('StepLocation')), 'PassThru')
+            step.location = location_name if location_name in PICO_LOCATION else 'PassThru'
+            step.temperature = int(s.get('Temperature') or 0)
+            step.step_time = int(s.get('Time') or 0)
+            step.drain_time = int(s.get('Drain') or 0)
+            pico.steps.append(step)
+        return pico
 
     def update_from_form(self, form):
         """Apply edits posted from recipe_editor.html onto the original raw recipe
@@ -532,22 +577,35 @@ class ReduxRecipe():
         r = self._raw['VM']['Recipe']
         content = self._raw['VM']['Content']
 
+        self._raw['Machine'] = form.get('Machine', self._raw.get('Machine')) or 'Custom'
+        self._raw['TagID'] = (form.get('TagID', self._raw.get('TagID')) or '').strip() or None
+        self._raw['image'] = form.get('Image', self._raw.get('image')) or self._raw.get('image')
+
         new_name = form.get('Name', '').strip() or r.get('Name') or 'Empty Recipe'
         r['Name'] = new_name
         r['BeerStyle']['StyleNameCode'] = form.get('StyleNameCode', r['BeerStyle'].get('StyleNameCode'))
+        r['BatchSize'] = to_float(form.get('BatchSize'), r.get('BatchSize'))
+        r['H2O'] = to_float(form.get('H2O'), r.get('H2O'))
+        r['MashType'] = to_int(form.get('MashType'), r.get('MashType'))
+        r['BoilTime'] = to_int(form.get('BoilTime'), r.get('BoilTime'))
+        r['IsFirstWort'] = form.get('IsFirstWort', str(r.get('IsFirstWort'))) == 'True'
+        r['FermentationType'] = to_int(form.get('FermentationType'), r.get('FermentationType'))
         r['TastingNotes'] = form.get('TastingNotes', r.get('TastingNotes', ''))
         r['BrewingInstructionsText'] = form.get('BrewingInstructionsText', r.get('BrewingInstructionsText', ''))
         r['FermentationInstructionsText'] = form.get('FermentationInstructionsText', r.get('FermentationInstructionsText', ''))
         content['SpecialBrewingInstructions'] = form.get('SpecialBrewingInstructions', content.get('SpecialBrewingInstructions', ''))
 
         r['MashSteps'] = rebuild_rows('MashSteps', {'Name': None, 'Temp': to_float, 'Time': to_float})
-        r['Fermentables'] = rebuild_rows('Fermentables', {'Name': None, 'Amount': to_float, 'ColorPts': to_float})
+        r['Fermentables'] = rebuild_rows('Fermentables', {'Name': None, 'Amount': to_float, 'ColorPts': to_float, 'PotentialGravity': to_float})
         r['BoilSteps'] = rebuild_rows('BoilSteps', {'Location': to_int, 'Temp': to_float, 'Time': to_float})
-        r['Hops'] = rebuild_rows('Hops', {'Name': None, 'Amount': to_float, 'Alpha': to_float, 'Time': to_float})
+        r['Hops'] = rebuild_rows('Hops', {'Name': None, 'Amount': to_float, 'Alpha': to_float, 'Time': to_float, 'IBU': to_float})
         r['WhirlpoolSteps'] = rebuild_rows('WhirlpoolSteps', {'Location': to_int, 'Temp': to_float, 'Time': to_float})
-        r['WhirlpoolHops'] = rebuild_rows('WhirlpoolHops', {'Name': None, 'Amount': to_float, 'Alpha': to_float, 'Time': to_float})
-        r['DryHops'] = rebuild_rows('DryHops', {'Name': None, 'Amount': to_float, 'Alpha': to_float, 'Time': to_float})
+        r['WhirlpoolHops'] = rebuild_rows('WhirlpoolHops', {'Name': None, 'Amount': to_float, 'Alpha': to_float, 'Time': to_float, 'IBU': to_float})
+        r['DryHops'] = rebuild_rows('DryHops', {'Name': None, 'Amount': to_float, 'Alpha': to_float, 'Time': to_float, 'IBU': to_float})
         r['Amendments'] = rebuild_rows('Amendments', {'Name': None, 'Amount': to_float, 'Units': None})
+        r['Adjuncts'] = rebuild_rows('Adjuncts', {'Name': None, 'Amount': to_float, 'Units': None, 'Time': to_float})
+        r['WhirlpoolAdjuncts'] = rebuild_rows('WhirlpoolAdjuncts', {'Name': None, 'Amount': to_float, 'Units': None, 'Time': to_float})
+        r['DryAdjuncts'] = rebuild_rows('DryAdjuncts', {'Name': None, 'Amount': to_float, 'Units': None, 'Time': to_float})
         r['FermentationSteps'] = rebuild_rows('FermentationSteps', {'Name': None, 'Temp': to_float, 'Days': to_float, 'Hours': to_float})
         # Temperature/Time/Drain must stay ints: routes_frontend.py builds the wort curve
         # via range(s['Time']), which raises TypeError on a float.
@@ -562,6 +620,21 @@ class ReduxRecipe():
             y['MaxTemp'] = to_float(form.get('Yeast.MaxTemp'), y.get('MaxTemp'))
             y['ExpectedTemp'] = to_float(form.get('Yeast.ExpectedTemp'), y.get('ExpectedTemp'))
 
+        # Recompute the top-level vitals from the edited ingredient tables so pages that
+        # read recipe['OG']/'FG'/'IBU'/'SRM'/'ABV' directly (e.g. recipe_list.html) stay in
+        # sync -- mirrors the live JS calculation in recipe_calculations.js.
+        srm = sum((f.get('ColorPts') or 0) for f in r['Fermentables'])
+        og_pts = sum((f.get('PotentialGravity') or 0) for f in r['Fermentables'])
+        ibu = sum((h.get('IBU') or 0) for h in r['Hops'] + r['WhirlpoolHops'] + r['DryHops'])
+        og = 1 + og_pts / 1000
+        atten = (r.get('Yeast') or {}).get('ExpectedAtten') or 0
+        fg = 1 + (og - 1) * (1 - atten / 100)
+        r['SRM'] = round(srm, 2)
+        r['OG'] = round(og, 4)
+        r['FG'] = round(fg, 4)
+        r['IBU'] = round(ibu, 1)
+        r['ABV'] = round((og - fg) * 131.25, 2)
+
         filename = self.filepath
         if new_name != self.name:
             new_filename = str(recipe_path(MachineType.UNIFIED, self.is_archived).joinpath(
@@ -574,3 +647,5 @@ class ReduxRecipe():
             json.dump(self._raw, out, indent=4, sort_keys=True)
 
         self.name = new_name
+        self.TagID = self._raw['TagID']
+        self.image = self._raw['image']

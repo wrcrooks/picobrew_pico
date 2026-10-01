@@ -6,7 +6,7 @@ import subprocess
 from typing import Optional
 from .config import base_path
 
-from .routes_frontend import get_pico_recipes
+from .routes_frontend import get_pico_recipes, find_redux_recipe_by_tag_id
 from .session_parser import (active_brew_sessions, active_ferm_sessions,
                              active_iSpindel_sessions, active_tilt_sessions, active_still_sessions)
 from .config import base_path
@@ -139,6 +139,8 @@ def parse_and_send(itype: int, uid: str, message: str, topic: Optional[str] = No
             if itype == 2:
                 if 'rfid' in messageJSON:
                     recipe = next((r for r in get_pico_recipes(False) if r.id == messageJSON['rfid']), None)
+                    if not recipe:
+                        recipe = find_redux_recipe_by_tag_id(messageJSON['rfid'])
                     bodyJSON['recipe'] = ('Invalid Recipe') if not recipe else (recipe.name)
                 publish_mqtt_message(json.dumps(bodyJSON), topic_complete)
             if itype == 3:

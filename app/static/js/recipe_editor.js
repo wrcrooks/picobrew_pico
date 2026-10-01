@@ -27,6 +27,7 @@ function wireRecipeRowButtons(row) {
     if (removeBtn) {
         removeBtn.addEventListener('click', function () {
             row.remove();
+            if (window.recomputeRecipeStats) window.recomputeRecipeStats();
         });
     }
 }
@@ -40,6 +41,8 @@ function addRecipeRow(tableName) {
     wireRecipeRowButtons(newRow);
     // the "+ Add Row" row is always tbody's last child; insert new rows above it
     tbody.insertBefore(newRow, tbody.lastElementChild);
+    if (window.wireNewRecipeRow) window.wireNewRecipeRow(tableName, newRow);
+    if (window.recomputeRecipeStats) window.recomputeRecipeStats();
 }
 
 function renumberRecipeTable(table) {
@@ -55,6 +58,29 @@ function renumberRecipeTable(table) {
     });
 }
 
+// Tag Programming section: a physical NFC tag's ID is arbitrary (any 14-character value can
+// be written to a blank/rewritable tag), so a fresh recipe with none assigned yet gets a
+// random one prefilled -- saving the form immediately gives it a real, usable tag ID rather
+// than leaving the field blank until the user thinks to fill it in themselves.
+function randomTagId() {
+    var chars = '0123456789abcdef';
+    var out = '';
+    for (var i = 0; i < 14; i++) out += chars.charAt(Math.floor(Math.random() * chars.length));
+    return out;
+}
+
+function wireTagId() {
+    var input = document.getElementById('input-tag-id');
+    if (!input) return;
+    if (!input.value) input.value = randomTagId();
+    var btn = document.getElementById('btn-generate-tag-id');
+    if (btn) {
+        btn.addEventListener('click', function () {
+            input.value = randomTagId();
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('[data-add-row-for]').forEach(function (btn) {
         btn.addEventListener('click', function () {
@@ -66,10 +92,20 @@ document.addEventListener('DOMContentLoaded', function () {
         table.querySelectorAll('tbody tr[data-recipe-row]').forEach(wireRecipeRowButtons);
     });
 
+    wireTagId();
+
     var form = document.querySelector('form');
     if (form) {
         form.addEventListener('submit', function () {
             document.querySelectorAll('table[data-recipe-table]').forEach(renumberRecipeTable);
+
+            // recipe_images[""] (pico_image.js) holds the display image as a hex string,
+            // kept live by pico_recipe.js's change listener on #recipe_image_loader -- copy
+            // it into the hidden field the form actually submits right before it does.
+            var imageInput = document.getElementById('input-recipe-image');
+            if (imageInput && typeof recipe_images !== 'undefined' && recipe_images[''] !== undefined) {
+                imageInput.value = recipe_images[''];
+            }
         });
     }
 });

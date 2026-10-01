@@ -1,0 +1,51 @@
+<form id="import_recipe_{{recipe_type}}" class="text-white-50 import-recipe-form" data-post-url="{{post_url}}" data-redirect="{{redirect_url}}">
+
+  {% if user_required %}
+  <div class="form-row">
+    <div class="form-group col-sm-5">
+      <label for="guid_{{recipe_type}}">User GUID</label>
+      <input type="text" class="form-control form-control-sm" name="guid" id="guid_{{recipe_type}}"
+        placeholder="32 Character Profile GUID (Username > Settings > Account)">
+    </div>
+  </div>
+  {% endif %}
+
+  {% if rfid_required %}
+  <div class="form-row">
+    <div class="form-group col-sm-5">
+      <label for="rfid_{{recipe_type}}">PicoPak RFID</label>
+      <input type="text" class="form-control form-control-sm" name="rfid" id="rfid_{{recipe_type}}"
+        placeholder="14 Character RFID on PicoPak">
+    </div>
+  </div>
+  {% endif %}
+
+  {% if machine_ids|length == 0 %}
+  <div class="form-row">
+    <div class="form-group col-sm-5">
+      <label for="uid_{{recipe_type}}">Machine/Product ID</label>
+      <input type="text" class="form-control form-control-sm" name="uid" id="uid_{{recipe_type}}"
+        placeholder="Product ID (Username > Settings > Equipment)" value="{{machine_id}}">
+    </div>
+  </div>
+  {% else %}
+  <div class="form-row">
+    <div class="form-group col-sm-5">
+      <label for="uid_{{recipe_type}}">Machine/Product ID</label>
+      <select class="form-control form-control-sm" name="uid" id="uid_{{recipe_type}}">
+        <option selected>Choose Product ID...</option>
+        {% for id in machine_ids %}
+        <option>{{id}}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="form-row">
+    <div class="form-group col-sm-4"></div>
+    <div class="form-group col-sm-1">
+      <button class="btn btn-sm btn-secondary btn-block" type="button">Import</button>
+    </div>
+  </div>
+</form>

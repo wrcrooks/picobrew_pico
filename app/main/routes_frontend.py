@@ -1,9 +1,10 @@
 import json
+import math
 import os
 import uuid
 from datetime import timedelta, datetime
 from markupsafe import escape
-from flask import current_app, make_response, request, send_file, render_template, redirect
+from flask import current_app, make_response, request, send_file, render_template, redirect, url_for, jsonify
 from pathlib import Path
 from ruamel.yaml import YAML
 from webargs import fields
@@ -23,7 +24,7 @@ from .session_parser import (_paginate_sessions, list_session_files,
                              get_brew_graph_data, get_ferm_graph_data, get_still_graph_data, get_iSpindel_graph_data, get_tilt_graph_data,
                              active_brew_sessions, active_ferm_sessions, active_still_sessions, active_iSpindel_sessions, active_tilt_sessions,
                              add_invalid_session, get_invalid_sessions, load_brew_sessions)
-from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION, SRM_COLOR_DATA, LOVIBOND_COLOR_DATA, bjcp_2008_substyles
+from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION, SRM_COLOR_DATA, LOVIBOND_COLOR_DATA, bjcp_2008_substyles, MACHINE_BATCH_PRESETS
 
 file_glob_pattern = "[!._]*.json"
 yaml = YAML()
@@ -132,7 +133,8 @@ def import_zymatic_recipe():
             return getattr(e, 'message', e.args[0]), 400
     else:
         machine_ids = [uid for uid in active_brew_sessions if active_brew_sessions[uid].machine_type == MachineType.ZYMATIC]
-        return render_template_with_defaults('import_brewhouse_recipe.html', user_required=True, machine_ids=machine_ids)
+        return render_template_with_defaults('import_brewhouse_recipe.html', user_required=True, machine_ids=machine_ids,
+                                              post_url='/import_zymatic_recipe', redirect_url='/legacy_recipes', recipe_type='zymatic')
 
 
 @main.route('/update_zymatic_recipe', methods=['POST'])
@@ -396,7 +398,8 @@ def import_zseries_recipe():
             return getattr(e, 'message', e.args[0]), 400
     else:
         machine_ids = [uid for uid in active_brew_sessions if active_brew_sessions[uid].machine_type == MachineType.ZSERIES]
-        return render_template_with_defaults('import_brewhouse_recipe.html', user_required=False, machine_ids=machine_ids)
+        return render_template_with_defaults('import_brewhouse_recipe.html', user_required=False, machine_ids=machine_ids,
+                                              post_url='/import_zseries_recipe', redirect_url='/legacy_recipes', recipe_type='zseries')
 
 
 def load_zseries_recipes(include_archived=True):
@@ -496,6 +499,23 @@ def format_datetime_filter(value, format="%m/%d/%Y"):
     return value
 main.add_app_template_filter(format_datetime_filter, 'format_datetime')
 
+
+def srm_color_filter(value):
+    """SRM_COLOR_DATA (model.py) only has entries for 1-30 plus every 5th value up to 60 --
+    a direct dict[key] lookup (recipe_list_redux.html) throws for anything else, which
+    real-world recipes hit constantly (very dark/high-SRM styles, or an SRM outside 1-60
+    entirely). Falls back to the nearest defined key instead of erroring the whole page."""
+    try:
+        key = int(round(float(value)))
+    except (TypeError, ValueError):
+        key = 1
+    if key in SRM_COLOR_DATA:
+        return SRM_COLOR_DATA[key]
+    keys = sorted(SRM_COLOR_DATA.keys())
+    nearest = min(keys, key=lambda k: abs(k - key))
+    return SRM_COLOR_DATA[nearest]
+main.add_app_template_filter(srm_color_filter, 'srm_color')
+
 @main.route('/recipes')
 def _recipes():
     global redux_recipes, invalid_recipes
@@ -554,6 +574,59 @@ def _recipe(args):
                 recipe['MachineSteps'][s]['StepLocation'] = k.replace("Adjunct", "Adjunct ").replace("PassThru", "Pass Through")
     return render_template_with_defaults('recipe_viewer.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData)
 
+# Constants and algorithm ported exactly from picobrew.com's own Crafter JS
+# (getBrewGraphData/minutesToTimeString) so the estimate matches the live site bit-for-bit,
+# not just approximately -- verified against a real recipe's printed page (3 hrs 0 min /
+# 2 hrs 15 mins reproduced exactly for its MachineSteps).
+HEATING_SLOPE_C_PER_MIN = 4.96
+HEAT_LOSS_SLOPE_C_PER_MIN = 0.585
+HEATING_SLOPE_F_PER_MIN = HEATING_SLOPE_C_PER_MIN * 9 / 5
+HEAT_LOSS_SLOPE_F_PER_MIN = HEAT_LOSS_SLOPE_C_PER_MIN * 9 / 5
+
+
+def minutes_to_time_string(n):
+    hours = n / 60
+    rhours = math.floor(hours)
+    rminutes = round((hours - rhours) * 60)
+    return f"{rhours} hr{'s' if rhours > 1 else ''} and {rminutes} min{'s' if rminutes > 1 else ''}"
+
+
+def estimate_recipe_brew_chill_time(recipe):
+    steps = recipe.get('MachineSteps') or []
+    if not steps:
+        return minutes_to_time_string(0), minutes_to_time_string(0)
+
+    is_metric = recipe.get('UseMetric', False)
+    heating_slope = HEATING_SLOPE_C_PER_MIN if is_metric else HEATING_SLOPE_F_PER_MIN
+    heat_loss_slope = HEAT_LOSS_SLOPE_C_PER_MIN if is_metric else HEAT_LOSS_SLOPE_F_PER_MIN
+    current_time = 0.0
+    current_temp = 12.7 if is_metric else 55
+    chill_time = 0.0
+    last_index = len(steps) - 1
+
+    for i, step in enumerate(steps):
+        is_chill_step = (i == last_index) and step['Temperature'] < current_temp
+        if step['StepLocation'] == 6:  # Pause -- no time or temperature change
+            continue
+        next_temp = step['Temperature']
+        if next_temp <= 0:
+            continue
+        if next_temp != current_temp:
+            change_temp_time = ((next_temp - current_temp) / heating_slope if next_temp > current_temp
+                                 else (current_temp - next_temp) / heat_loss_slope)
+            if is_chill_step:
+                chill_time = change_temp_time
+            else:
+                current_time += change_temp_time
+        if not is_chill_step:
+            current_temp = next_temp
+            current_time += step['Time']
+            if step.get('Drain', 0) > 0:
+                current_time += step['Drain']
+
+    return minutes_to_time_string(round(current_time)), minutes_to_time_string(round(chill_time))
+
+
 def build_default_brewing_instructions(recipe):
     human = recipe.get('HumanBrewingSteps') or {}
     lines = []
@@ -578,17 +651,277 @@ def build_default_brewing_instructions(recipe):
 def build_default_fermentation_instructions(recipe):
     steps = recipe.get('FermentationSteps') or []
     human = recipe.get('HumanBrewingSteps') or {}
+    yeast = recipe.get('Yeast') or {}
+    is_metric = recipe.get('UseMetric', False)
+    fermentation_type = recipe.get('FermentationType', 0)
     lines = []
-    if steps:
-        lines.append('Cool to {}°F'.format(steps[0]['Temp']))
+
+    # Matches picobrew's own Crafter JS exactly: "Cool to X" is the yeast's expected pitch
+    # temperature (falling back to 68°F / 20°C if unset), *not* the fermentation step's own
+    # temp -- those can legitimately differ (e.g. a later crash-chill step).
+    expected_temp = yeast.get('ExpectedTemp')
+    cool_to_temp = expected_temp if expected_temp and expected_temp > 0 else (20 if is_metric else 68)
+    lines.append('Cool to {:g}{}'.format(cool_to_temp, '°C' if is_metric else '°F'))
+
     lines.append('Pitch Yeast')
     if human.get('LoadFermentationAdditions'):
         lines.append(human['LoadFermentationAdditions'])
         for fa in human.get('FermentationAdditions', []):
             lines.append('- {} {} of {}'.format(fa['Amount'], fa['Units'], fa['Name']))
-    if steps:
+
+    # FermentationType: 0=Ale, 1=Lager, 2=Advanced/Custom -- matches picobrew's own template
+    # exactly (ng-if="recipe.FermentationType != 2"): Ale shows the actual configured days,
+    # Lager shows a fixed reference lagering schedule regardless of FermentationSteps, and
+    # Advanced/Custom schedules get no generic line at all.
+    if fermentation_type == 1:
+        lagering_temp = '1.6°C' if is_metric else '35°F'
+        lines.append('Keep temperature consistent for 3 weeks. Rack to a lagering container '
+                      'and keep at {} for another 4 weeks'.format(lagering_temp))
+    elif fermentation_type != 2 and steps:
         lines.append('Keep temperature consistent for {:.1f} Days'.format(steps[0]['Days']))
+
     return '\n'.join(lines)
+
+
+def build_style_suggestions():
+    """Item 6: mines the user's own local recipe library for which yeasts/hops are actually
+    paired with each BJCP style, used to suggest starting points on the recipe editor and
+    the new-recipe-from-style wizard. Never fabricates a suggestion -- a style with no local
+    recipes returns empty lists rather than a generic guess."""
+    from collections import Counter
+    by_style = {}
+    for r in load_redux_recipes():
+        style = getattr(r, 'StyleNameCode', None)
+        if not style:
+            continue
+        entry = by_style.setdefault(style, {'yeasts': Counter(), 'hops': Counter()})
+        yeast_name = (getattr(r, 'Yeast', None) or {}).get('Name')
+        if yeast_name:
+            entry['yeasts'][yeast_name] += 1
+        for h in getattr(r, 'Hops', None) or []:
+            if h.get('Name'):
+                entry['hops'][h['Name']] += 1
+    return {
+        style: {
+            'yeasts': [name for name, _ in data['yeasts'].most_common(3)],
+            'hops': [name for name, _ in data['hops'].most_common(3)],
+        }
+        for style, data in by_style.items()
+    }
+
+
+@main.route('/api/style_suggestions')
+def _api_style_suggestions():
+    style = request.args.get('style', '')
+    suggestions = build_style_suggestions().get(style, {'yeasts': [], 'hops': []})
+    return jsonify(suggestions)
+
+
+def generate_recipe_from_style(style, batch_size, suggestions, machine='Custom'):
+    """Item 2: builds a starting-point recipe targeting the midpoint of the given style's
+    OG/IBU/SRM ranges. Reuses the exact calibrated formulas already validated for live
+    recalculation elsewhere on the editor (DEFAULT_GRAVITY_CONSTANT/DEFAULT_COLOR_CONSTANT in
+    recipe_ingredients.js, the Tinseth IBU calibration in recipe_calculations.js) rather than
+    a separate, unverified formula set -- both were calibrated at a 2.5 gal baseline, so this
+    always builds at that baseline first and then scales to the requested batch size using
+    the same scaling identity Item 3 relies on: Amount/BatchSize/H2O scale together, while
+    PotentialGravity/ColorPts/IBU (concentration values) do not change."""
+    catalog = load_ingredient_database()
+    BASELINE_BATCH = 2.5
+    GRAVITY_K = 0.2068
+    COLOR_K = 0.242
+    TINSETH_CAL = 0.9074
+
+    def tinseth_ibu(amount_oz, alpha_pct, time_min, og):
+        bigness = 1.65 * 0.000125 ** (og - 1)
+        boil_factor = (1 - math.exp(-0.04 * time_min)) / 4.15
+        return (amount_oz * (alpha_pct / 100) * bigness * boil_factor * 7489 * TINSETH_CAL) / BASELINE_BATCH
+
+    target_og = (style['MinOG'] + style['MaxOG']) / 2
+    target_ibu = (style['MinIBU'] + style['MaxIBU']) / 2
+    target_srm = (style['MinSRM'] + style['MaxSRM']) / 2
+    target_og_pts = (target_og - 1) * 1000
+
+    # Fermentables: one base malt sized for ~90% of target gravity, plus one specialty grain
+    # (if the base malt's own color falls short of the style's target SRM) to close the color
+    # gap -- ColorPts/PotentialGravity here are exact given the chosen Amount (same formula
+    # the editor's own autofill uses), not estimates layered on top of an estimate.
+    grains = [f for f in catalog['Fermentables'] if f['FermentableType'] == 'Grain' and f['Yield'] > 0]
+    # Specialty grain first, picked dark enough that hitting the SRM target doesn't take an
+    # implausible amount of weight (a fixed "~40L crystal" choice works for an amber ale but
+    # blows the gravity budget wide open for a stout, which needs its color from a little
+    # roasted barley/black patent, not a lot of crystal -- caught by item 1's own compliance
+    # coloring going red on a first pass of this generator). Base malt is then sized to make
+    # up exactly whatever gravity the specialty grain didn't already contribute, so the two
+    # always sum to target_og_pts by construction rather than by a fixed 90/10 split.
+    base_malt = min(grains, key=lambda f: f['Color'])
+    fermentables = []
+    specialty_gravity_pts = 0
+    if target_srm > 3:
+        target_specialty_color = min(600, max(15, target_srm * 15))
+        specialty_pool = [f for f in grains if f['Color'] > base_malt['Color'] + 5]
+        specialty = min(specialty_pool, key=lambda f: abs(f['Color'] - target_specialty_color)) if specialty_pool else None
+        if specialty:
+            specialty_amount = round(max(target_srm / (specialty['Color'] * COLOR_K), 0.05), 2)
+            specialty_gravity_pts = specialty_amount * specialty['Yield'] * GRAVITY_K
+            fermentables.append({
+                'Amount': specialty_amount, 'ColorPts': round(specialty_amount * specialty['Color'] * COLOR_K, 2),
+                'Errors': [], 'PotentialGravity': round(specialty_gravity_pts, 2),
+                'FermentableID': specialty.get('FermentableID', 0), 'Name': specialty['Name'],
+                'Color': specialty['Color'], 'Yield': specialty['Yield'], 'FermentableType': specialty['FermentableType'],
+            })
+
+    base_og_pts = max(target_og_pts - specialty_gravity_pts, target_og_pts * 0.5)
+    base_amount = round(base_og_pts / (base_malt['Yield'] * GRAVITY_K), 2)
+    fermentables.insert(0, {
+        'Amount': base_amount, 'ColorPts': round(base_amount * base_malt['Color'] * COLOR_K, 2), 'Errors': [],
+        'PotentialGravity': round(base_og_pts, 2), 'FermentableID': base_malt.get('FermentableID', 0),
+        'Name': base_malt['Name'], 'Color': base_malt['Color'], 'Yield': base_malt['Yield'],
+        'FermentableType': base_malt['FermentableType'],
+    })
+
+    # Hops: prefer whatever the user's own recipe library actually pairs with this style
+    # (item 6's suggestions); fall back to a general-purpose ~6% AA hop when there's no
+    # local data for it. One 60-min bittering addition (75% of target IBU) plus one 15-min
+    # flavor addition (25%).
+    hop_matches = [h for h in (next((c for c in catalog['Hops'] if c['Name'] == n), None) for n in suggestions.get('hops', [])) if h]
+    if not hop_matches:
+        hop_matches = sorted((h for h in catalog['Hops'] if h['Alpha'] > 0), key=lambda h: abs(h['Alpha'] - 6))[:2]
+    if len(hop_matches) == 1:
+        hop_matches = hop_matches * 2
+
+    def size_hop_for_ibu(alpha_pct, time_min, ibu_target):
+        bigness = 1.65 * 0.000125 ** (target_og - 1)
+        boil_factor = (1 - math.exp(-0.04 * time_min)) / 4.15
+        denom = (alpha_pct / 100) * bigness * boil_factor * 7489 * TINSETH_CAL / BASELINE_BATCH
+        return round(max(ibu_target / denom, 0.1), 2) if denom > 0 else 0.5
+
+    bittering, flavor = hop_matches[0], hop_matches[1]
+    bittering_amount = size_hop_for_ibu(bittering['Alpha'], 60, target_ibu * 0.75)
+    flavor_amount = size_hop_for_ibu(flavor['Alpha'], 15, target_ibu * 0.25)
+    hops = [
+        {'Location': 2, 'Amount': bittering_amount, 'IBU': round(tinseth_ibu(bittering_amount, bittering['Alpha'], 60, target_og), 2),
+         'Time': 60.0, 'BoilUse': 0, 'Errors': [], 'AdjunctRound': 1, 'HopID': bittering.get('HopID', 0),
+         'Name': bittering['Name'], 'Alpha': bittering['Alpha']},
+        {'Location': 3, 'Amount': flavor_amount, 'IBU': round(tinseth_ibu(flavor_amount, flavor['Alpha'], 15, target_og), 2),
+         'Time': 15.0, 'BoilUse': 0, 'Errors': [], 'AdjunctRound': 1, 'HopID': flavor.get('HopID', 0),
+         'Name': flavor['Name'], 'Alpha': flavor['Alpha']},
+    ]
+
+    # Yeast: same "trust the user's own local pairing data first" preference as hops.
+    yeast_match = next((y for y in (next((c for c in catalog['Yeast'] if c['Name'] == n), None)
+                                     for n in suggestions.get('yeasts', [])) if y), None)
+    yeast = yeast_match or min((y for y in catalog['Yeast'] if y['ExpectedAtten'] > 0), key=lambda y: abs(y['ExpectedAtten'] - 75))
+    fermentation_type = 1 if (yeast['MinTemp'] + yeast['MaxTemp']) / 2 < 58 else 0
+    fg = 1 + (target_og - 1) * (1 - yeast['ExpectedAtten'] / 100)
+    abv = round((target_og - fg) * 131.25, 2)
+
+    # Scale from the calibration baseline to the requested batch size (Item 3's identity:
+    # only weights/volumes scale, the already-correct points fields above do not).
+    scale_ratio = batch_size / BASELINE_BATCH
+    for f in fermentables:
+        f['Amount'] = round(f['Amount'] * scale_ratio, 2)
+    for h in hops:
+        h['Amount'] = round(h['Amount'] * scale_ratio, 2)
+    h2o = round(BASELINE_BATCH * 1.43 * scale_ratio, 2)
+
+    mash_steps = [{'Name': 'Single Step Infusion Mash', 'Temp': 152.0, 'Time': 60.0, 'Style': 'Infusion', 'Errors': []}]
+    boil_steps = [
+        {'Name': 'Adjunct 1', 'Temp': 207, 'Time': 60, 'BoilTime': 60, 'Ramp': True, 'IsWhirlpool': False, 'AdjunctRound': 1, 'Location': 2, 'Errors': []},
+        {'Name': 'Adjunct 2', 'Temp': 207, 'Time': 15, 'BoilTime': 15, 'Ramp': False, 'IsWhirlpool': False, 'AdjunctRound': 1, 'Location': 3, 'Errors': []},
+    ]
+    fermentation_steps = [
+        {'Step': 1, 'Name': 'Fermentation', 'Temp': yeast['ExpectedTemp'], 'Days': 10.0 if fermentation_type == 0 else 21.0, 'Hours': 0.0, 'Minutes': 0},
+        {'Step': 2, 'Name': 'Crash Chill', 'Temp': 44.0, 'Days': 0.0, 'Hours': 0.0, 'Minutes': 0},
+    ]
+    machine_steps = [
+        {'ID': 0, 'Step': 0, 'Name': 'Heat Water', 'Temperature': 152, 'Time': 0, 'Drain': 0, 'StepLocation': 0},
+        {'ID': 0, 'Step': 1, 'Name': 'Mash', 'Temperature': 152, 'Time': 60, 'Drain': 8, 'StepLocation': 1},
+        {'ID': 0, 'Step': 2, 'Name': 'Heat to Boil', 'Temperature': 207, 'Time': 0, 'Drain': 0, 'StepLocation': 0},
+        {'ID': 0, 'Step': 3, 'Name': 'Boil Adjunct 1', 'Temperature': 207, 'Time': 45, 'Drain': 0, 'StepLocation': 2},
+        {'ID': 0, 'Step': 4, 'Name': 'Boil Adjunct 2', 'Temperature': 207, 'Time': 15, 'Drain': 5, 'StepLocation': 3},
+        {'ID': 0, 'Step': 5, 'Name': 'Connect Chiller', 'Temperature': 0, 'Time': 0, 'Drain': 0, 'StepLocation': 6},
+        {'ID': 0, 'Step': 6, 'Name': 'Chill', 'Temperature': 65, 'Time': 10, 'Drain': 10, 'StepLocation': 0},
+    ]
+    water_stats = [
+        {'Item1': 'Starting Water', 'Item2': f'{h2o} gal Water ({round(h2o * 8.34, 2)} lbs)'},
+        {'Item1': 'Batch Size', 'Item2': f'{batch_size} Gal'},
+    ]
+    human_brewing_steps = {
+        'FillKeg': f'Fill keg with {h2o} Gal water',
+        'LoadMash': 'Mill grain and load into mash compartment',
+        'Mash': [{'Name': f['Name'], 'Units': 'lbs', 'Amount': f['Amount']} for f in fermentables],
+        'LoadAdjuncts': 'Load hops and other boil/whirlpool additions into adjunct compartments:',
+        'AdjunctRounds': [{
+            'Round': 1, 'AddInTime': 0,
+            'Adjuncts1': [{'Name': hops[0]['Name'], 'Units': 'oz', 'Amount': hops[0]['Amount']}],
+            'Adjuncts2': [{'Name': hops[1]['Name'], 'Units': 'oz', 'Amount': hops[1]['Amount']}],
+            'Adjuncts3': [], 'Adjuncts4': [],
+        }],
+    }
+
+    recipe_name = f"{style['StyleNameCode']} ({batch_size:g} gal)"
+    beer_style = {k: v for k, v in style.items() if k not in ('ColorHEX', 'ColorCategory')}
+    vm_recipe = {
+        'RecipeID': 0, 'GUID': None, 'PreviousGUID': None, 'Efficiency': 55.0, 'Author': 'You',
+        'Name': recipe_name, 'WortSize': None, 'BatchSize': round(batch_size, 2), 'CreationDate': datetime.now().isoformat(),
+        'ABV': abv, 'IBU': round(target_ibu, 1), 'SRM': round(target_srm, 1), 'FG': round(fg, 4), 'OG': round(target_og, 4),
+        'Version': 1, 'StyleID': style.get('StyleID', 0), 'BeerStyle': beer_style, 'MashProfile': None,
+        'Notes': f"Generated starting point for {style['StyleNameCode']} -- review and adjust before brewing.",
+        'SyncStatus': False, 'H2O': h2o, 'RecipeFile': None, 'Locked': False, 'Shared': False,
+        'OriginalName': recipe_name, 'OriginalAuthor': 'You', 'TastingNotes': '', 'BoilSize': None,
+        'Deleted': False, 'Imported': False, 'OriginalAuthorID': 0, 'WhirlpoolTemp': None,
+        'BoilTemp': 207, 'BoilTime': 60, 'MashTime': 60, 'MashTemp': 152, 'MashType': 0,
+        'IsFirstWort': False, 'Errors': [], 'Warnings': [],
+        'Fermentables': fermentables, 'Hops': hops, 'DryHops': [], 'WhirlpoolHops': [],
+        'Adjuncts': [], 'WhirlpoolAdjuncts': [], 'DryAdjuncts': [],
+        'Yeast': dict(yeast), 'Amendments': [], 'MachineSteps': machine_steps,
+        'FermentationSteps': fermentation_steps, 'FermentationType': fermentation_type,
+        'BoilSteps': boil_steps, 'MashSteps': mash_steps, 'WhirlpoolSteps': [],
+        'IsMetric': False, 'SessionCount': 0, 'CrafterVersion': 1, 'IsBiB': False, 'RecipeType': 0,
+        'HumanBrewingSteps': human_brewing_steps, 'BrewingInstructionsText': None,
+        'FermentationInstructionsText': None,
+    }
+    new_guid = uuid.uuid4().hex
+    full_json = {
+        'RecipeGUID': new_guid, 'UseMetric': False, 'Machine': machine,
+        'VM': {
+            'Recipe': vm_recipe,
+            'Content': {'Sections': [{'Stats': water_stats}], 'SpecialBrewingInstructions': ''},
+        },
+    }
+    safe_name = recipe_name.replace(' ', '_').replace("'", '').replace('/', '-')
+    filename = recipe_path(MachineType.UNIFIED).joinpath(f'{safe_name}.json')
+    with open(filename, 'w') as f:
+        json.dump(full_json, f, indent=4, sort_keys=True)
+    return new_guid
+
+
+@main.route('/recipe/new_from_style', methods=['GET', 'POST'])
+def _recipe_new_from_style():
+    catalog = load_ingredient_database()
+    if request.method == 'POST':
+        style_name = request.form.get('style_name', '')
+        style_guide = request.form.get('style_guide', '')
+        try:
+            batch_size = float(request.form.get('batch_size') or 2.5)
+        except ValueError:
+            batch_size = 2.5
+        machine = request.form.get('machine') or 'Custom'
+        style = next((s for s in catalog['BeerStyles']
+                      if s['StyleNameCode'] == style_name and s['StyleGuide'] == style_guide), None)
+        if not style:
+            return 'Style not found', 404
+        suggestions = build_style_suggestions().get(style_name, {'yeasts': [], 'hops': []})
+        new_guid = generate_recipe_from_style(style, batch_size, suggestions, machine)
+        return redirect(f'/recipe/edit/{new_guid}')
+
+    styles_by_guide = {}
+    for s in catalog['BeerStyles']:
+        styles_by_guide.setdefault(s['StyleGuide'], []).append(s)
+    for guide_styles in styles_by_guide.values():
+        guide_styles.sort(key=lambda s: (int(s.get('CatNumCode') or 0), s.get('CatLettCode') or '', s['StyleNameCode']))
+    return render_template_with_defaults('new_recipe_from_style.html', styles_by_guide=styles_by_guide, machine_presets=MACHINE_BATCH_PRESETS)
 
 
 @main.route('/recipe/edit/<rfid>', methods=['GET', 'POST'])
@@ -630,7 +963,19 @@ def _recipe_edit(rfid):
     location_options = [(v, k.replace('Adjunct', 'Adjunct ').replace('PassThru', 'Pass Through'))
                          for k, v in ZSERIES_LOCATION.items()]
 
-    return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, bjcp_2008_substyles=bjcp_2008_substyles, location_options=location_options)
+    # pre_hop_boil_time matches picobrew's own Crafter JS exactly (getMaxBoilStepTime(): the boil
+    # runs BoilTime minutes total, and this is how long it ran before its longest-boiled hop or
+    # boil adjunct went in). whirlpool_time mirrors that same "longest thing added" shape for the
+    # whirlpool stage (no reference implementation available for this one).
+    max_boil_step_time = max([h['Time'] for h in recipe['Hops']] +
+                              [a['Time'] for a in recipe['Adjuncts']], default=0)
+    pre_hop_boil_time = recipe['BoilTime'] - max_boil_step_time
+    whirlpool_time = max([s['Time'] for s in recipe['WhirlpoolSteps']] +
+                          [h['Time'] for h in recipe['WhirlpoolHops']] +
+                          [a['Time'] for a in recipe['WhirlpoolAdjuncts']], default=0)
+    brew_time, chill_time = estimate_recipe_brew_chill_time(recipe)
+
+    return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, bjcp_2008_substyles=bjcp_2008_substyles, location_options=location_options, pre_hop_boil_time=pre_hop_boil_time, whirlpool_time=whirlpool_time, brew_time=brew_time, chill_time=chill_time, machine_presets=MACHINE_BATCH_PRESETS)
 
 @main.route('/api/modifyRecipe', methods=['POST'])
 def _api_modifyRecipe():
@@ -655,18 +1000,208 @@ def _recipe_delete(rfid):
     return '', 204
 
 
-@main.route('/ingredients')
-def _ingredients():
-    global ingredients
-    ingredients = load_ingredients() or {'Fermentables': [], 'Hops': [], 'Yeast': [], 'WaterAmendments': []}
-    for f in ingredients['Fermentables']:
-        # LOVIBOND_COLOR_DATA
+# Maps each ingredients-page category to the field that identifies an entry, used both to
+# merge the picobrew catalog with the user's custom additions and to validate new-ingredient
+# submissions below.
+INGREDIENT_NAME_KEYS = {
+    'Fermentables': 'Name',
+    'Hops': 'Name',
+    'Yeast': 'Name',
+    'Adjuncts': 'Name',
+    'WaterAmendments': 'Name',
+    'BeerStyles': 'StyleNameCode',
+}
+
+
+def merge_ingredient_list(catalog_items, custom_items, name_key, guide_key=None):
+    """Merges a picobrew catalog list with the user's custom entries, keyed by name -- a
+    custom entry sharing a name with a catalog one overrides it (so a user can correct or
+    override a catalog value by re-adding it), rather than being silently hidden.
+
+    guide_key exists for BeerStyles specifically: the same style name legitimately has a
+    different entry per BJCP guide year (2008/2015/2021 vital stats all differ), so those
+    need a (name, guide) composite key instead of colliding down to one row."""
+    def dedup_key(item):
+        name = (item.get(name_key) or '').strip().lower()
+        if not name:
+            return None
+        if guide_key:
+            return (name, (item.get(guide_key) or '').strip().lower())
+        return name
+
+    merged = {}
+    for item in catalog_items:
+        key = dedup_key(item)
+        if key:
+            merged[key] = item
+    for item in custom_items:
+        key = dedup_key(item)
+        if key:
+            merged[key] = item
+    return list(merged.values())
+
+
+def load_ingredient_database():
+    """The full picobrew.com ingredient catalog (Fermentables/Hops/Yeasts/Adjuncts/
+    WaterAmendments/BeerStyles) -- extracted directly from the live Crafter page's own
+    in-memory ingredient lists, see app/static/data/picobrew_ingredients.json -- merged
+    with any custom entries the user has added locally (via /new_ingredient) in
+    app/recipes/ingredients/ingredients.json."""
+    catalog_path = Path(current_app.root_path) / 'static' / 'data' / 'picobrew_ingredients.json'
+    try:
+        with open(catalog_path) as f:
+            catalog = json.load(f)
+    except Exception as e:
+        current_app.logger.error("ERROR: could not load ingredient catalog {}".format(catalog_path))
+        current_app.logger.error(e)
+        catalog = {}
+
+    custom = load_ingredients() or {}
+    result = {
+        'Fermentables': merge_ingredient_list(catalog.get('fermentables', []), custom.get('Fermentables', []), 'Name'),
+        'Hops': merge_ingredient_list(catalog.get('hops', []), custom.get('Hops', []), 'Name'),
+        'Yeast': merge_ingredient_list(catalog.get('yeasts', []), custom.get('Yeast', []), 'Name'),
+        'Adjuncts': merge_ingredient_list(catalog.get('adjuncts', []), custom.get('Adjuncts', []), 'Name'),
+        'WaterAmendments': merge_ingredient_list(catalog.get('amendments', []), custom.get('WaterAmendments', []), 'Name'),
+        'BeerStyles': merge_ingredient_list(catalog.get('beerStyles', []), custom.get('BeerStyles', []), 'StyleNameCode', guide_key='StyleGuide'),
+    }
+
+    for f in result['Fermentables']:
         for c in LOVIBOND_COLOR_DATA:
             if float(f['Color']) >= c['Lower'] and float(f['Color']) < c['Upper']:
                 f['ColorHEX'] = c['HEX']
                 f['ColorCategory'] = c['Category']
-    # recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
-    return render_template_with_defaults('ingredients.html', ingredients=ingredients)
+                break
+
+    result['Fermentables'].sort(key=lambda i: i.get('Name', ''))
+    result['Hops'].sort(key=lambda i: i.get('Name', ''))
+    result['Yeast'].sort(key=lambda i: (i.get('Laboratory') or '', i.get('Name', '')))
+    result['Adjuncts'].sort(key=lambda i: i.get('Name', ''))
+    result['WaterAmendments'].sort(key=lambda i: i.get('Name', ''))
+    result['BeerStyles'].sort(key=lambda i: (int(i.get('CatNumCode') or 0), i.get('CatLettCode') or ''))
+
+    return result
+
+
+@main.route('/ingredients')
+def _ingredients():
+    global ingredients
+    ingredients = load_ingredient_database()
+    return render_template_with_defaults('ingredients.html', ingredients=ingredients, ingredient_table_ids=INGREDIENT_TABLE_IDS)
+
+
+# Anchors matching each section's <table id="..."> in ingredients.html, so /new_ingredient
+# can redirect back to the right section after saving.
+INGREDIENT_TABLE_IDS = {
+    'Fermentables': 'table-fermentables',
+    'Hops': 'table-hops',
+    'Yeast': 'table-yeasts',
+    'Adjuncts': 'table-adjuncts',
+    'WaterAmendments': 'table-amendments',
+    'BeerStyles': 'table-styles',
+}
+
+INGREDIENT_DISPLAY_NAMES = {
+    'Fermentables': 'Fermentable',
+    'Hops': 'Hop',
+    'Yeast': 'Yeast',
+    'Adjuncts': 'Adjunct',
+    'WaterAmendments': 'Water Amendment',
+    'BeerStyles': 'Beer Style',
+}
+
+# Drives both the /new_ingredient form and its submission handling below -- one schema
+# instead of six hand-written forms/parsers.
+INGREDIENT_FIELDS = {
+    'Fermentables': [
+        {'key': 'Name', 'label': 'Name', 'type': 'text', 'required': True},
+        {'key': 'FermentableType', 'label': 'Type', 'type': 'select',
+         'options': ['Grain', 'Extract', 'DryExtract', 'Sugar', 'OtherGrain'], 'default': 'Grain'},
+        {'key': 'Color', 'label': 'Color (°L)', 'type': 'number', 'step': '0.1', 'default': '0'},
+        {'key': 'Yield', 'label': 'Yield (PPG)', 'type': 'number', 'step': '0.1', 'default': '0'},
+        {'key': 'Supplier', 'label': 'Supplier', 'type': 'text'},
+        {'key': 'Origin', 'label': 'Origin', 'type': 'text'},
+    ],
+    'Hops': [
+        {'key': 'Name', 'label': 'Name', 'type': 'text', 'required': True},
+        {'key': 'Alpha', 'label': 'Alpha (%)', 'type': 'number', 'step': '0.1', 'default': '0'},
+    ],
+    'Yeast': [
+        {'key': 'Name', 'label': 'Name', 'type': 'text', 'required': True},
+        {'key': 'Laboratory', 'label': 'Laboratory', 'type': 'text'},
+        {'key': 'ProductID', 'label': 'Product ID', 'type': 'text'},
+        {'key': 'MinAtten', 'label': 'Min Attenuation (%)', 'type': 'number', 'step': '0.1', 'default': '0'},
+        {'key': 'MaxAtten', 'label': 'Max Attenuation (%)', 'type': 'number', 'step': '0.1', 'default': '0'},
+        {'key': 'ExpectedAtten', 'label': 'Expected Attenuation (%)', 'type': 'number', 'step': '0.1', 'default': '0'},
+        {'key': 'MinTemp', 'label': 'Min Temp (°F)', 'type': 'number', 'step': '1', 'default': '0'},
+        {'key': 'MaxTemp', 'label': 'Max Temp (°F)', 'type': 'number', 'step': '1', 'default': '0'},
+        {'key': 'ExpectedTemp', 'label': 'Pitch Temp (°F)', 'type': 'number', 'step': '1', 'default': '0'},
+    ],
+    'Adjuncts': [
+        {'key': 'Name', 'label': 'Name', 'type': 'text', 'required': True},
+        {'key': 'AdjunctType', 'label': 'Type', 'type': 'select',
+         'options': ['Fining', 'Herb', 'Spice', 'Other'], 'default': 'Other'},
+        {'key': 'Use', 'label': 'Use', 'type': 'text'},
+    ],
+    'WaterAmendments': [
+        {'key': 'Name', 'label': 'Name', 'type': 'text', 'required': True},
+        {'key': 'Description', 'label': 'Description', 'type': 'text'},
+    ],
+    'BeerStyles': [
+        {'key': 'StyleNameCode', 'label': 'Style Name', 'type': 'text', 'required': True},
+        {'key': 'CatNumCode', 'label': 'Category Number', 'type': 'text'},
+        {'key': 'CatLettCode', 'label': 'Category Letter', 'type': 'text'},
+        {'key': 'StyleGuide', 'label': 'Style Guide', 'type': 'text', 'default': 'Custom'},
+        {'key': 'MinOG', 'label': 'Min OG', 'type': 'number', 'step': '0.001', 'default': '1.000'},
+        {'key': 'MaxOG', 'label': 'Max OG', 'type': 'number', 'step': '0.001', 'default': '1.000'},
+        {'key': 'MinFG', 'label': 'Min FG', 'type': 'number', 'step': '0.001', 'default': '1.000'},
+        {'key': 'MaxFG', 'label': 'Max FG', 'type': 'number', 'step': '0.001', 'default': '1.000'},
+        {'key': 'MinIBU', 'label': 'Min IBU', 'type': 'number', 'step': '1', 'default': '0'},
+        {'key': 'MaxIBU', 'label': 'Max IBU', 'type': 'number', 'step': '1', 'default': '0'},
+        {'key': 'MinSRM', 'label': 'Min SRM', 'type': 'number', 'step': '1', 'default': '0'},
+        {'key': 'MaxSRM', 'label': 'Max SRM', 'type': 'number', 'step': '1', 'default': '0'},
+        {'key': 'MinABV', 'label': 'Min ABV (%)', 'type': 'number', 'step': '0.1', 'default': '0'},
+        {'key': 'MaxABV', 'label': 'Max ABV (%)', 'type': 'number', 'step': '0.1', 'default': '0'},
+    ],
+}
+
+
+@main.route('/new_ingredient', methods=['GET', 'POST'])
+def _new_ingredient():
+    ingredient_type = request.values.get('type', '')
+    fields = INGREDIENT_FIELDS.get(ingredient_type)
+    if not fields:
+        return 'Unknown ingredient type: {}'.format(ingredient_type), 404
+
+    error = None
+    if request.method == 'POST':
+        data = {}
+        for field in fields:
+            raw = request.form.get(field['key'], '').strip()
+            if field['type'] == 'number':
+                try:
+                    data[field['key']] = float(raw) if raw else float(field.get('default', 0))
+                except ValueError:
+                    data[field['key']] = float(field.get('default', 0))
+            else:
+                data[field['key']] = raw or field.get('default') or None
+
+        name_key = INGREDIENT_NAME_KEYS[ingredient_type]
+        if not data.get(name_key):
+            name_label = next(f['label'] for f in fields if f['key'] == name_key)
+            error = '{} is required.'.format(name_label)
+        else:
+            custom = load_ingredients() or {}
+            custom.setdefault(ingredient_type, [])
+            custom[ingredient_type].append(data)
+            filepath = current_app.config['RECIPES_PATH'].joinpath('ingredients/ingredients.json')
+            filepath.parent.mkdir(parents=True, exist_ok=True)
+            with open(filepath, 'w') as f:
+                json.dump(custom, f, indent=4, sort_keys=True)
+            return redirect(url_for('main._ingredients') + '#' + INGREDIENT_TABLE_IDS[ingredient_type])
+
+    display_name = INGREDIENT_DISPLAY_NAMES.get(ingredient_type, ingredient_type)
+    return render_template_with_defaults('new_ingredient.html', ingredient_type=ingredient_type, display_name=display_name, fields=fields, error=error, form=request.form)
 
 @main.route('/ingredient/edit/<id>', methods=['GET', 'POST'])
 def _ingredient_edit(id):
@@ -692,6 +1227,50 @@ def _ingredient_delete(id):
 get_recipe_args = {
     'rfid': fields.Str(required=True)      # 14 character alpha-numeric PicoPak RFID
 }
+
+
+def _recipe_list_dict(recipes):
+    return [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in recipes]
+
+
+@main.route('/legacy_recipes')
+def _legacy_recipes():
+    """Combined Library page for all three legacy (pre-unified) recipe formats -- replaces
+    the three separate Pico/Zymatic/ZSeries Recipes navbar dropdowns with sections on one
+    page. The individual /pico_recipes, /zymatic_recipes, /zseries_recipes routes and
+    templates are left in place (nothing else in the app assumes they're gone -- e.g.
+    _recipe_edit's new_zymatic_recipe() fallback), just no longer linked from the navbar."""
+    global pico_recipes, zymatic_recipes, zseries_recipes, invalid_recipes
+    pico_recipes = load_pico_recipes()
+    zymatic_recipes = load_zymatic_recipes()
+    zseries_recipes = load_zseries_recipes()
+    return render_template_with_defaults(
+        'legacy_recipes.html',
+        pico_recipes=_recipe_list_dict(pico_recipes),
+        zymatic_recipes=_recipe_list_dict(zymatic_recipes),
+        zseries_recipes=_recipe_list_dict(zseries_recipes),
+        invalid_pico=invalid_recipes.get(MachineType.PICOBREW, set()),
+        invalid_zymatic=invalid_recipes.get(MachineType.ZYMATIC, set()),
+        invalid_zseries=invalid_recipes.get(MachineType.ZSERIES, set()))
+
+
+@main.route('/legacy_import')
+def _legacy_import():
+    """Combined Import page for all three legacy recipe formats. Each section's form posts
+    (via import_recipe.js) straight to the existing per-machine import endpoint
+    (/import_pico_recipe etc.) -- those endpoints' POST handlers are unchanged, only their
+    GET-rendered standalone page is being superseded as the linked entry point."""
+    pico_machine_ids = [uid for uid in active_brew_sessions
+                         if active_brew_sessions[uid].machine_type in [MachineType.PICOBREW, MachineType.PICOBREW_C]]
+    zymatic_machine_ids = [uid for uid in active_brew_sessions
+                            if active_brew_sessions[uid].machine_type == MachineType.ZYMATIC]
+    zseries_machine_ids = [uid for uid in active_brew_sessions
+                            if active_brew_sessions[uid].machine_type == MachineType.ZSERIES]
+    return render_template_with_defaults(
+        'legacy_import.html',
+        pico_machine_ids=pico_machine_ids,
+        zymatic_machine_ids=zymatic_machine_ids,
+        zseries_machine_ids=zseries_machine_ids)
 
 
 @main.route('/pico_recipes')
@@ -728,7 +1307,8 @@ def import_pico_recipe():
             return getattr(e, 'message', e.args[0]), 400
     else:
         machine_ids = [uid for uid in active_brew_sessions if active_brew_sessions[uid].machine_type in [MachineType.PICOBREW, MachineType.PICOBREW_C]]
-        return render_template_with_defaults('import_brewhouse_recipe.html', rfid_required=True, machine_ids=machine_ids)
+        return render_template_with_defaults('import_brewhouse_recipe.html', rfid_required=True, machine_ids=machine_ids,
+                                              post_url='/import_pico_recipe', redirect_url='/legacy_recipes', recipe_type='pico')
 
 
 @main.route('/update_pico_recipe', methods=['POST'])
@@ -835,6 +1415,18 @@ def load_redux_recipe(file):
 
     recipe.name_escaped = escape(recipe.name).replace(" ", "_")
     return recipe
+
+
+def find_redux_recipe_by_tag_id(tag_id, include_archived=False):
+    """Shared by the real device-facing endpoints (routes_pico_api.py's getRecipe, mqtt.py's
+    scan notification) and the Tag Scanner browser tool -- a unified recipe only matches a
+    physical NFC tag scan via its own assigned TagID (recipe_editor.html's Tag Programming
+    section), never its RecipeGUID. Defaults to active-only, matching get_pico_recipes(False)
+    parity for what a real Pico may actually be served; the scanner tool passes
+    include_archived=True since an archived match is still a useful diagnostic answer there."""
+    if not tag_id:
+        return None
+    return next((r for r in load_redux_recipes(include_archived) if r.TagID == tag_id), None)
 
 def load_pico_recipes(include_archived=True):
     synced_files = list(recipe_path(MachineType.PICOBREW).glob(file_glob_pattern))

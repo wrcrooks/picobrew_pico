@@ -6,242 +6,161 @@
 <script src="/static/js/base_recipe.js"></script>
 <script src="/static/js/pico_recipe.js"></script>
 <script>var tables = {};</script>
-<!-- {% include "units_selector.html" %} -->
 {% include "ingredient_actions.html" %}
 {% include "invalid_file.html" %}
-<!-- <br /><br /><br /> -->
-<script src='/static/js/showdown/showdown.min.js'></script>
-<script>
-  const classMap = {
-    table: 'table table-dark table-striped table-bordered'
-  }
-  const bindings = Object.keys(classMap)
-    .map(key => ({
-      type: 'output',
-      regex: new RegExp(`<${key}(.*)>`, 'g'),
-      replace: `<${key} class="${classMap[key]}" $1>`
-  }));
-  const options = {
-    'tables': true, 
-    'simpleLineBreaks': true,
-    'extensions': [...bindings]
-  };
-  const converter = new showdown.Converter(options);
-
-  function getMarkdown(text, outDiv) {
-    target = document.getElementById(outDiv);
-    html = converter.makeHtml(text);
-    target.innerHTML = html;
-  }
-</script>
-<div id="accordion">
-    <div class="ml-3 mb-2 text-white" style="font-size: 1.75rem">Fermentables</div>
-    {% for fermentable in ingredients['Fermentables'] %}
-    <div class="container mb-1">
-      <div class="card p-3">
-        <div class="row align-items-center">
-          <div class="col-1">
-            <img src="" width="100%"/>
-          </div>
-          <div class="col-6">
-              <h3 class="mb-0">{{ fermentable['Name'] }}</h3>
-              <small class="text-muted"><strong>{{ (fermentable['Supplier']) if (fermentable['Supplier'] and fermentable['Supplier'] != "") else "" }}</strong></small>
-              <div><small>{{ ("Origin: " + fermentable['Origin']) if (fermentable['Origin'] and fermentable['Origin'] != "") else "" }}</small></div>
-          </div>  
-          <div class="col-3">
-            <div class="row align-items-center">
-              <div class="col-12 d-flex justify-content-end align-items-center mb-2">
-                  <span class="fw-bold text-nowrap"></span>
-              </div>
-              <div class="col-12 d-flex justify-content-start">
-                <table class="table table-sm table-borderless text-center mb-0" style="width: auto;">
-                  <thead>
-                      <tr class="text-uppercase small text-muted">
-                          <th>Color</th>
-                          <th>PPG</th>
-                          <th>Type</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      <tr>
-                          <td><strong>{{ fermentable['Color'] }}</strong> <span title="{{ fermentable['ColorCategory'] }}" class="p-1 rounded d-inline-block" style="background-color: {{ fermentable['ColorHEX'] }};"><i class="bi bi-check-lg text-white"></i></span></td>
-                          <td><strong>{{ fermentable['Yield'] }}</strong></td>
-                          <td><strong>{{ fermentable['FermentableType'] }}</strong></td>
-                      </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <div class="col-2 text-start border-start d-flex justify-content-end">
-            <div class="px-3">
-              <a href="{{ url_for('main._ingredient_edit', id='NONE') }}">
-              <button class="btn btn-sm btn-success">
-                <i class="fas fa-pencil"></i>
-              </button>
-              </a>
-              <a href="{{ url_for('main._ingredient_clone', id='NONE') }}">
-              <button class="btn btn-sm btn-info">
-                <i class="fas fa-copy"></i>
-              </button>
-              </a>
-              <a href="{{ url_for('main._ingredient_delete', id='NONE') }}">
-              <button class="btn btn-sm btn-danger">
-                <i class="fas fa-trash"></i>
-              </button>
-              </a>
-            </div>
-          </div>
+{% macro ingredient_table(section_id, ingredient_type, title, count, headers) %}
+<div class="mb-4">
+    <div class="d-flex align-items-center justify-content-between ml-3 mr-3 mb-2">
+        <span class="text-white" style="font-size: 1.5rem">{{ title }} <span class="text-muted" style="font-size: 1rem">({{ count }})</span></span>
+        <div class="d-flex align-items-center">
+            <input type="text" class="form-control form-control-sm mr-2" style="max-width:250px;" placeholder="Filter {{ title|lower }}..." data-ingredient-filter="{{ section_id }}">
+            <a href="{{ url_for('main._new_ingredient', type=ingredient_type) }}" class="btn btn-sm btn-success text-nowrap">
+                <i class="fas fa-plus"></i> Add
+            </a>
         </div>
-      </div>
     </div>
-    {% endfor %}
-    <div class="ml-3 mb-2 text-white" style="font-size: 1.75rem">Hops</div>
-    {% for hops in ingredients['Hops'] %}
-    <div class="container mb-1">
-      <div class="card p-3">
-        <div class="row align-items-center">
-          <div class="col-1">
-            <img src="" width="100%"/>
-          </div>
-          <div class="col-6">
-              <h3 class="mb-0">{{ hops['Name'] }}</h3>
-              <small class="text-muted"><strong>{{ (hops['Supplier']) if (hops['Supplier'] and hops['Supplier'] != "") else "" }}</strong></small>
-              <div><small>{{ ("Origin: " + hops['Origin']) if (hops['Origin'] and hops['Origin'] != "") else "" }}</small></div>
-          </div>  
-          <div class="col-3">
-            <div class="row align-items-center">
-              <div class="col-12 d-flex justify-content-end align-items-center mb-2">
-                  <span class="fw-bold text-nowrap"></span>
-              </div>
-              <div class="col-12 d-flex justify-content-start">
-                <table class="table table-sm table-borderless text-center mb-0" style="width: auto;">
-                  <thead>
-                      <tr class="text-uppercase small text-muted">
-                          <th>Alpha</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      <tr>
-                          <td><strong>{{ hops['Alpha'] }}</strong></td>
-                      </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <div class="col-2 text-start border-start d-flex justify-content-end">
-            <div class="px-3">
-              <button class="btn btn-sm btn-success">
-                <i class="fas fa-pencil"></i>
-              </button>
-              </a>
-              <button class="btn btn-sm btn-info">
-                <i class="fas fa-copy"></i>
-              </button>
-              <button class="btn btn-sm btn-danger">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
+    <div class="container">
+        <div class="table-responsive">
+            <table class="table table-sm table-dark table-striped table-hover mb-0" id="{{ section_id }}">
+                <thead>
+                    <tr>
+                        {% for h in headers %}<th>{{ h }}</th>{% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ caller() }}
+                </tbody>
+            </table>
         </div>
-      </div>
     </div>
-    {% endfor %}
-    <div class="ml-3 mb-2 text-white" style="font-size: 1.75rem">Yeasts</div>
-    {% for yeast in ingredients['Yeast'] %}
-    <div class="container mb-1">
-      <div class="card p-3">
-        <div class="row align-items-center">
-          <div class="col-1">
-            <img src="" width="100%"/>
-          </div>
-          <div class="col-6">
-              <h3 class="mb-0">{{ yeast['Name'] }}</h3>
-              <small class="text-muted"><strong>{{ yeast['Laboratory'] }}</strong> {{ yeast['ProductID'] }}</small>
-          </div>  
-          <div class="col-3">
-            <div class="row align-items-center">
-              <div class="col-12 d-flex justify-content-end align-items-center mb-2">
-                  <span class="fw-bold text-nowrap"></span>
-              </div>
-              <div class="col-12 d-flex justify-content-start">
-                <table class="table table-sm table-borderless text-center mb-0" style="width: auto;">
-                  <thead>
-                      <tr class="text-uppercase small text-muted">
-                          <th>Min Temp</th>
-                          <th>Max Temp</th>
-                          <th>Expected Temp</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      <tr>
-                          <td><strong>{{ yeast['MinTemp'] }}</strong></td>
-                          <td><strong>{{ yeast['MaxTemp'] }}</strong></td>
-                          <td><strong>{{ yeast['ExpectedTemp'] }}</strong></td>
-                      </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-          <div class="col-2 text-start border-start d-flex justify-content-end">
-            <div class="px-3">
-              <button class="btn btn-sm btn-success">
-                <i class="fas fa-pencil"></i>
-              </button>
-              </a>
-              <button class="btn btn-sm btn-info">
-                <i class="fas fa-copy"></i>
-              </button>
-              <button class="btn btn-sm btn-danger">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    {% endfor %}
-    <div class="ml-3 mb-2 text-white" style="font-size: 1.75rem">Water Amendments</div>
-    {% for amendment in ingredients['WaterAmendments'] %}
-    <div class="container mb-1">
-      <div class="card p-3">
-        <div class="row align-items-center">
-          <div class="col-1">
-            <img src="" width="100%"/>
-          </div>
-          <div class="col-6">
-              <h3 class="mb-0">{{ amendment['Name'] }}</h3>
-          </div>  
-          <div class="col-3">
-            <div class="row align-items-center">
-              <div class="col-12 d-flex justify-content-end align-items-center mb-2">
-                  <span class="fw-bold text-nowrap"></span>
-              </div>
-              <div class="col-12 d-flex justify-content-start">
-                {{ amendment['Description'] }}
-              </div>
-            </div>
-          </div>
-          <div class="col-2 text-start border-start d-flex justify-content-end">
-            <div class="px-3">
-              <button class="btn btn-sm btn-success">
-                <i class="fas fa-pencil"></i>
-              </button>
-              </a>
-              <button class="btn btn-sm btn-info">
-                <i class="fas fa-copy"></i>
-              </button>
-              <button class="btn btn-sm btn-danger">
-                <i class="fas fa-trash"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    {% endfor %}
-
 </div>
+{% endmacro %}
+
+{% call ingredient_table('table-fermentables', 'Fermentables', 'Fermentables', ingredients['Fermentables']|length, ['Name', 'Type', 'Color (°L)', 'Yield (PPG)']) %}
+{% for f in ingredients['Fermentables'] %}
+<tr>
+    <td>{{ f['Name'] }}</td>
+    <td>{{ f['FermentableType'] }}</td>
+    <td>{{ f['Color'] }}<span title="{{ f.get('ColorCategory', '') }}" class="p-1 ml-1 rounded d-inline-block" style="background-color: {{ f.get('ColorHEX', 'transparent') }}; width: 0.9em; height: 0.9em;"></span></td>
+    <td>{{ f['Yield'] }}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+
+{% call ingredient_table('table-hops', 'Hops', 'Hops', ingredients['Hops']|length, ['Name', 'Alpha (%)']) %}
+{% for h in ingredients['Hops'] %}
+<tr>
+    <td>{{ h['Name'] }}</td>
+    <td>{{ h['Alpha'] }}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+
+{% call ingredient_table('table-yeasts', 'Yeast', 'Yeasts', ingredients['Yeast']|length, ['Name', 'Laboratory', 'Product ID', 'Expected Atten (%)', 'Temp Range (°F)', 'Pitch Temp (°F)']) %}
+{% for y in ingredients['Yeast'] %}
+<tr>
+    <td>{{ y['Name'] }}</td>
+    <td>{{ y.get('Laboratory', '') }}</td>
+    <td>{{ y.get('ProductID', '') }}</td>
+    <td>{{ y.get('ExpectedAtten', '') }}</td>
+    <td>{{ y.get('MinTemp', '') }} - {{ y.get('MaxTemp', '') }}</td>
+    <td>{{ y.get('ExpectedTemp', '') }}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+
+{% call ingredient_table('table-adjuncts', 'Adjuncts', 'Adjuncts', ingredients['Adjuncts']|length, ['Name', 'Type', 'Use']) %}
+{% for a in ingredients['Adjuncts'] %}
+<tr>
+    <td>{{ a['Name'] }}</td>
+    <td>{{ a.get('AdjunctType', '') }}</td>
+    <td>{{ a.get('Use', '') or '' }}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+
+{% call ingredient_table('table-amendments', 'WaterAmendments', 'Water Amendments', ingredients['WaterAmendments']|length, ['Name', 'Description']) %}
+{% for a in ingredients['WaterAmendments'] %}
+<tr>
+    <td>{{ a['Name'] }}</td>
+    <td>{{ a.get('Description', '') or '' }}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+
+{% call ingredient_table('table-styles', 'BeerStyles', 'Beer Styles', ingredients['BeerStyles']|length, ['Code', 'Style', 'Guide', 'OG', 'FG', 'IBU', 'SRM', 'ABV']) %}
+{% for s in ingredients['BeerStyles'] %}
+<tr>
+    <td>{{ s['CatNumCode'] }}{{ s['CatLettCode'] }}</td>
+    <td>{{ s['StyleNameCode'] }}</td>
+    <td>{{ s.get('StyleGuide', '') }}</td>
+    <td>{{ '%.3f' | format(s['MinOG']|float) }} - {{ '%.3f' | format(s['MaxOG']|float) }}</td>
+    <td>{{ '%.3f' | format(s['MinFG']|float) }} - {{ '%.3f' | format(s['MaxFG']|float) }}</td>
+    <td>{{ s['MinIBU']|int }} - {{ s['MaxIBU']|int }}</td>
+    <td>{{ s['MinSRM']|int }} - {{ s['MaxSRM']|int }}</td>
+    <td>{{ s['MinABV'] }} - {{ s['MaxABV'] }}</td>
+</tr>
+{% endfor %}
+{% endcall %}
+
+<script>
+    // Simple client-side substring filter, one search box per ingredient table -- no need for
+    // a heavier grid library at this data size (a few hundred rows per table at most).
+    document.querySelectorAll('[data-ingredient-filter]').forEach(function (input) {
+        var table = document.getElementById(input.dataset.ingredientFilter);
+        if (!table) return;
+        input.addEventListener('input', function () {
+            var needle = input.value.trim().toLowerCase();
+            table.querySelectorAll('tbody tr').forEach(function (row) {
+                row.hidden = needle.length > 0 && row.innerText.toLowerCase().indexOf(needle) === -1;
+            });
+        });
+    });
+
+    // Item 8: reached via a "(Browse Ingredients)" link (opened in a new tab, so the recipe
+    // editor tab and any unsaved edits in it are never navigated away from) from the recipe
+    // editor (?pick=<Category>&return=<recipe_id>) -- adds a "+ Add to Recipe" column to the
+    // matching category's table. Picks are queued in localStorage; the recipe editor tab
+    // picks them up live via a "storage" event (see recipe_ingredients.js), so this tab
+    // never needs to redirect at all -- just confirms and lets you keep browsing.
+    (function () {
+        var params = new URLSearchParams(window.location.search);
+        var pickCategory = params.get('pick');
+        var returnId = params.get('return');
+        if (!pickCategory || !returnId) return;
+
+        var tableIds = {
+            Fermentables: 'table-fermentables', Hops: 'table-hops', Yeast: 'table-yeasts',
+            Adjuncts: 'table-adjuncts', WaterAmendments: 'table-amendments', BeerStyles: 'table-styles'
+        };
+        var table = document.getElementById(tableIds[pickCategory]);
+        if (!table) return;
+
+        var headRow = table.querySelector('thead tr');
+        if (headRow) headRow.appendChild(document.createElement('th'));
+
+        table.querySelectorAll('tbody tr').forEach(function (row) {
+            var td = document.createElement('td');
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-success text-nowrap';
+            btn.textContent = '+ Add to Recipe';
+            btn.addEventListener('click', function () {
+                var name = row.querySelector('td').textContent.trim();
+                var key = 'pending_ingredients_' + returnId;
+                var pending = [];
+                try { pending = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) {}
+                pending.push({ category: pickCategory, name: name });
+                // Re-set (not just push in place) so the "storage" event fires in the other
+                // tab even if this is the first pick of the session.
+                localStorage.setItem(key, JSON.stringify(pending));
+                btn.textContent = '✓ Added';
+                btn.disabled = true;
+                btn.classList.replace('btn-success', 'btn-outline-secondary');
+            });
+            td.appendChild(btn);
+            row.appendChild(td);
+        });
+    })();
+</script>
 {% endblock %}

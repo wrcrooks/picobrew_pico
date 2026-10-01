@@ -1,34 +1,10 @@
-<script src='/static/js/showdown/showdown.min.js'></script>
-<script>
-  const classMap = {
-    table: 'table table-dark table-striped table-bordered'
-  }
-  const bindings = Object.keys(classMap)
-    .map(key => ({
-      type: 'output',
-      regex: new RegExp(`<${key}(.*)>`, 'g'),
-      replace: `<${key} class="${classMap[key]}" $1>`
-  }));
-  const options = {
-    'tables': true, 
-    'simpleLineBreaks': true,
-    'extensions': [...bindings]
-  };
-  const converter = new showdown.Converter(options);
-
-  function getMarkdown(text, outDiv) {
-    target = document.getElementById(outDiv);
-    html = converter.makeHtml(text);
-    target.innerHTML = html;
-  }
-</script>
-<div id="accordion">
+<div id="accordion_{{recipe_type}}">
     {% for recipe in recipes %}
     <div class="card bg-dark text-white-50 recipe" data-recipe-id="{{recipe['id']}}">
         <h5 class="card-header" id="h_{{recipe['id']}}">
             <a class="collapsed" role="button" data-toggle="collapse" href="#c_{{recipe['id']}}"
                 data-toggle="tooltip" data-placement="bottom" title="Expand to See Recipe Details"
-                data-parent="#accordion" aria-expanded="false" aria-controls="c_{{recipe['id']}}">
+                data-parent="#accordion_{{recipe_type}}" aria-expanded="false" aria-controls="c_{{recipe['id']}}">
                 {{recipe['name']}}
                 {% if recipe['abv'] and recipe['ibu'] %}
                 (ABV = {{recipe['abv']}}, IBU = {{recipe['ibu']}})
@@ -50,22 +26,22 @@
                 </button>
                 <button class="btn btn-sm btn-primary float-right mr-3" type="button" id="bdownload_{{recipe['id']}}"
                     data-toggle="tooltip" data-placement="bottom" title="Download"
-                    onclick="event.stopPropagation();event.preventDefault();download_recipe('{{recipe['id']}}', '{{recipe['name_escaped']}}');">
+                    onclick="event.stopPropagation();event.preventDefault();{{recipe_type}}_download_recipe('{{recipe['id']}}', '{{recipe['name_escaped']}}');">
                     <i class="fas fa-download"></i>
                 </button>
                 <button class="btn btn-sm btn-info float-right mr-3" type="button" id="bclone_{{recipe['id']}}"
                     data-toggle="tooltip" data-placement="bottom" title="Clone/Copy"
-                    onclick='event.stopPropagation();event.preventDefault();clone_recipe({{recipe| tojson}});'>
+                    onclick='event.stopPropagation();event.preventDefault();{{recipe_type}}_clone_recipe({{recipe| tojson}});'>
                     <i class="fas fa-copy"></i>
                 </button>
                 <button class="btn btn-sm btn-danger float-right mr-3" type="button" id="bdelete_{{recipe['id']}}"
                     data-toggle="tooltip" data-placement="bottom" title="Delete"
-                    onclick="event.stopPropagation();event.preventDefault();delete_recipe('{{recipe['id']}}');">
+                    onclick="event.stopPropagation();event.preventDefault();{{recipe_type}}_delete_recipe('{{recipe['id']}}');">
                     <i class="fas fa-trash"></i>
                 </button>
                 <button class="btn btn-sm btn-success float-right mr-3" type="button" id="bsave_{{recipe['id']}}"
                     data-toggle="tooltip" data-placement="bottom" title="Save Changes"
-                    onclick="event.stopPropagation();event.preventDefault();update_recipe('{{recipe['id']}}');"
+                    onclick="event.stopPropagation();event.preventDefault();{{recipe_type}}_update_recipe('{{recipe['id']}}');"
                     style="display:none;">
                     <i class="far fa-save fa-lg"></i>
                 </button>
@@ -151,8 +127,9 @@
                 <script>
                     var recipe_id = "{{recipe['id']}}"
 
-                    recipe_table['data'] = {{ recipe['steps']| tojson }};
-                    tables[recipe_id] = new Tabulator(`#t_${recipe_id}`, recipe_table);
+                    {{recipe_type}}_recipe_table['data'] = {{ recipe['steps']| tojson }};
+                    tables[recipe_id] = new Tabulator(`#t_${recipe_id}`, {{recipe_type}}_recipe_table);
+                    tables[recipe_id].fixedRows = {{recipe_type|upper}}_FIXED_ROWS;
 
                     subscribe_table_callbacks(tables[recipe_id]);
                 </script>

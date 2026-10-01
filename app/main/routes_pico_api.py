@@ -1,8 +1,9 @@
 import json
 import os
 import uuid
+from collections import deque
 from datetime import datetime, timezone
-from flask import current_app
+from flask import current_app, jsonify, request
 from webargs import fields
 from webargs.flaskparser import use_args, FlaskParser
 
@@ -11,12 +12,34 @@ from . import main
 from .config import MachineType, brew_active_sessions_path, firmware_path
 from .firmware import firmware_filename, minimum_firmware, firmware_upgrade_required
 from .model import PicoBrewSession, PICO_SESSION
-from .routes_frontend import get_pico_recipes
+from .routes_frontend import get_pico_recipes, load_redux_recipes, find_redux_recipe_by_tag_id
 from .session_parser import active_brew_sessions, dirty_sessions_since_clean
 from .mqtt import parse_and_send
 
 
 arg_parser = FlaskParser()
+
+
+# In-memory log of the most recent NFC/RFID tag scans -- i.e. every getRecipe/error hit that
+# carries an rfid, which is the only moment a physical tag scan reaches this server. Powers
+# the Tag Scanner browser tool (/scanner): there's no other way to see which physical tag a
+# recipe is tied to, or what an unlabeled/mystery tag resolves to, short of reading server
+# logs. Newest first, capped so it can't grow unbounded across a long-running server.
+recent_tag_scans = deque(maxlen=100)
+
+
+def record_tag_scan(uid, rfid, recipe_name=None, found=False, event='scan'):
+    record = {
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+        'uid': uid,
+        'rfid': rfid,
+        'recipeName': recipe_name,
+        'found': found,
+        'event': event,
+    }
+    recent_tag_scans.appendleft(record)
+    socketio.emit('tag_scanned', json.dumps(record))
+    return record
 
 
 # Register: /API/pico/register?uid={UID}
@@ -128,6 +151,8 @@ error_args = {
 @use_args(error_args, location='querystring')
 def process_error(args):
     # TODO: Error Processing?
+    if args.get('rfid'):
+        record_tag_scan(args['uid'], args['rfid'], found=False, event='error ({})'.format(args.get('code')))
     parse_and_send(json.dumps(args), str(args['uid']) + "/error")
     return '\r\n'
 
@@ -190,6 +215,7 @@ get_recipe_args = {
 def process_get_recipe(args):
     # TODO: figure out what to do with IBU/ABV tweaks
     args['recipeName'] = get_recipe_name_by_id(args['rfid'])
+    record_tag_scan(args['uid'], args['rfid'], args['recipeName'], found=args['recipeName'] != 'Invalid Recipe')
     parse_and_send(2, args['uid'], json.dumps(args), str(args['uid']) + "/RecipeLoaded")
     return '#{0}#'.format(get_recipe_by_id(args['rfid']))
 
@@ -279,21 +305,102 @@ def process_set_cleaned(args):
 
 
 # -------- Utility --------
+# A real Pico's getRecipe/getAssociatedPaks scans only ever carry a 14-character tag ID, so
+# these three all fall back to a unified recipe carrying that same TagID (assigned in
+# recipe_editor.html's Tag Programming section) when no legacy recipe matches -- letting a
+# unified recipe actually be brewed via a physical NFC scan, not just identified by the Tag
+# Scanner tool. Active-only (include_archived=False), matching get_pico_recipes(False)'s own
+# "only what a real Pico may currently be served" semantics.
 def get_recipe_by_id(recipe_id):
     recipe = next((r for r in get_pico_recipes(False) if r.id == recipe_id), None)
-    return '' if not recipe else recipe.serialize()
+    if recipe:
+        return recipe.serialize()
+    redux_recipe = find_redux_recipe_by_tag_id(recipe_id, include_archived=False)
+    return redux_recipe.to_legacy_pico_recipe().serialize() if redux_recipe else ''
 
 
 def get_recipe_name_by_id(recipe_id):
     recipe = next((r for r in get_pico_recipes(False) if r.id == recipe_id), None)
-    return 'Invalid Recipe' if not recipe else recipe.name
+    if recipe:
+        return recipe.name
+    redux_recipe = find_redux_recipe_by_tag_id(recipe_id, include_archived=False)
+    return redux_recipe.name if redux_recipe else 'Invalid Recipe'
 
 
 def get_recipe_list():
     recipe_list = ''
     for r in get_pico_recipes(False):
         recipe_list += f'{r.id},{r.name}|'
+    for r in load_redux_recipes(False):
+        if r.TagID:
+            recipe_list += f'{r.TagID},{r.name}|'
     return recipe_list
+
+
+# -------- Tag Scanner browser tool (see app/templates/scanner.html) --------
+# Recipes searched here come from two independent stores that are mid-migration: legacy
+# PicoBrewRecipe files (app/recipes/pico/*.json, viewed at /pico_recipes) and the newer
+# unified/Redux store (app/recipes/unified/*.json, viewed/created at /recipes and edited at
+# /recipe/edit/<id> -- what /pico_recipes is being retired in favor of). A unified recipe's
+# 'id' is its 32-character RecipeGUID (used to build its edit-page link), which is NOT what
+# goes on a physical tag; its optional 'TagID' (set in the editor's Tag Programming section,
+# and what get_recipe_by_id/get_recipe_name_by_id above actually serve to a real Pico) is the
+# 14-character value that does, so 'tagId' below is what the browser tool should actually
+# show/match as a tag -- None until the recipe's had one assigned.
+def _recipe_summary(recipe, source):
+    return {
+        'id': recipe.id,
+        'name': recipe.name,
+        'abv': recipe.abv,
+        'ibu': recipe.ibu,
+        'is_archived': recipe.is_archived,
+        'source': source,
+        'tagId': recipe.id if source == 'pico' else getattr(recipe, 'TagID', None),
+    }
+
+
+def find_recipe_by_rfid(rfid):
+    # Include archived recipes -- a tag pointing at an archived recipe is still a useful,
+    # identifiable answer for this tool, unlike the machine-facing endpoints above which must
+    # only ever hand a real Pico its currently active recipes.
+    recipe = next((r for r in get_pico_recipes(True) if r.id == rfid), None)
+    if recipe:
+        return _recipe_summary(recipe, 'pico')
+    recipe = find_redux_recipe_by_tag_id(rfid, include_archived=True)
+    return _recipe_summary(recipe, 'unified') if recipe else None
+
+
+def find_recipes_by_name(query):
+    query = query.strip().lower()
+    if not query:
+        return []
+    matches = [_recipe_summary(r, 'pico') for r in get_pico_recipes(True) if query in (r.name or '').lower()]
+    matches += [_recipe_summary(r, 'unified') for r in load_redux_recipes() if query in (r.name or '').lower()]
+    matches.sort(key=lambda r: r['name'].lower())
+    return matches[:25]
+
+
+@main.route('/API/scanner/recent')
+def process_scanner_recent():
+    return jsonify(list(recent_tag_scans))
+
+
+scanner_lookup_args = {
+    'rfid': fields.Str(required=True),
+}
+
+
+@main.route('/API/scanner/lookup')
+@use_args(scanner_lookup_args, location='querystring')
+def process_scanner_lookup(args):
+    rfid = args['rfid'].strip()
+    recipe = find_recipe_by_rfid(rfid)
+    return jsonify({'rfid': rfid, 'found': recipe is not None, 'recipe': recipe})
+
+
+@main.route('/API/scanner/search_recipe')
+def process_scanner_search_recipe():
+    return jsonify(find_recipes_by_name(request.args.get('q', '')))
 
 
 def create_new_session(uid, sesId, sesType):

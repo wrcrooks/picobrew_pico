@@ -1,5 +1,10 @@
 .DS_Store
 
+# editor swap/backup files (vim, nano, emacs)
+*.swp
+*.swo
+*~
+
 # python files
 **/__pycache__
 env

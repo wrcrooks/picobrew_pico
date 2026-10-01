@@ -31,6 +31,7 @@ var isDataLoading = true;
 var tables_loaded = [];
 
 function rowIsEditable(cell,plus) {
+    var fixedRows = cell.getTable().fixedRows || 0;
     var pos = cell.getTable().getRowPosition(cell.getRow(),true);
     pos += plus ? 1 : 0;
     return (pos < fixedRows) ? false : true;
@@ -53,8 +54,32 @@ function showAlert(msg, type) {
     $('#alert').show();
 }
 
+// Generic fixed-row protection: rows before a table's own .fixedRows count (set on the
+// Tabulator instance right after construction -- see recipe_list.html / new_*_recipe.html)
+// can't be dragged out of place or have other rows dragged above them. A no-op when
+// fixedRows is 0/unset (Zymatic, Z-Series), matching the previous behavior of always
+// returning true for those types.
 function isRowMoved(row){
-	return true;
+	var fixedRows = row.getTable().fixedRows || 0;
+	var pos = row.getPosition(true);
+	var index = row.getIndex();
+	var moved = true;
+
+	if (pos < fixedRows) {
+		row.move(fixedRows-1);
+		row.getTable().redraw(true);
+	}
+
+	if (index < fixedRows) {
+		if (index == 0)
+			row.move(1, true);
+		else
+			row.move(index-1);
+		moved = false;
+		row.getTable().redraw(true);
+	}
+
+	return moved;
 }
 
 function displayUnsavedState(recipe_id) {
@@ -126,6 +151,7 @@ function subscribe_table_callbacks(table) {
 }
 
 function removeMoveHandles(table) {
+    var fixedRows = table.fixedRows || 0;
     table.getRows().filter(row => row.getIndex() < fixedRows)
         .forEach(row => {
             row.getCell("handle").getElement().children[0].style.display = "none";

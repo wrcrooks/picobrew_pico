@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width: 600px;">
+    <h3 class="text-white mb-3">New Recipe from Style</h3>
+    <p class="text-muted small">
+        Generates a starting-point recipe (grain bill, hop schedule, yeast) targeting the
+        middle of the selected style's OG/IBU/SRM ranges, using ingredients your own recipe
+        library actually pairs with that style where possible. It's a starting point, not a
+        finished recipe -- review and adjust everything before brewing.
+    </p>
+    <form method="POST" action="{{ url_for('main._recipe_new_from_style') }}">
+        <div class="form-group mb-3">
+            <label class="text-white">Style</label>
+            <select class="form-control" id="style_choice" required>
+                <option value="" disabled selected>Choose a style...</option>
+                {% for guide, styles in styles_by_guide.items() %}
+                <optgroup label="{{ guide }}">
+                    {% for s in styles %}
+                    <option value="{{ s['StyleNameCode'] }}::{{ s['StyleGuide'] }}">{{ s['CatNumCode'] }}{{ s['CatLettCode'] }} {{ s['StyleNameCode'] }}</option>
+                    {% endfor %}
+                </optgroup>
+                {% endfor %}
+            </select>
+        </div>
+        <input type="hidden" name="style_name" id="style_name">
+        <input type="hidden" name="style_guide" id="style_guide">
+
+        <div class="form-group mb-3">
+            <label class="text-white">Machine</label>
+            <select class="form-control" name="machine" id="wizard_machine" style="max-width:200px;">
+                {% for m in machine_presets.keys() %}
+                <option value="{{ m }}">{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-2" id="wizard_batch_presets"></div>
+        <div class="form-group mb-3">
+            <label class="text-white">Batch Size (gal)</label>
+            <input type="number" step="0.1" min="0.1" class="form-control" name="batch_size" id="wizard_batch_size" value="1.25" style="max-width:150px;">
+        </div>
+        <button type="submit" class="btn btn-success">Generate Recipe</button>
+        <a href="{{ url_for('main._recipes') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+    <hr class="mt-4">
+    <p class="text-muted small mb-1">
+        Need full manual control over mash/boil steps instead? Use one of the legacy,
+        machine-specific recipe creators:
+    </p>
+    <a href="{{ url_for('main.new_pico_recipe') }}" class="btn btn-sm btn-outline-secondary mr-2 mb-1">
+        Legacy Pico Recipe Creator
+    </a>
+    <a href="{{ url_for('main.new_zymatic_recipe') }}" class="btn btn-sm btn-outline-secondary mr-2 mb-1">
+        Legacy Zymatic Recipe Creator
+    </a>
+    <a href="{{ url_for('main.new_zseries_recipe') }}" class="btn btn-sm btn-outline-secondary mb-1">
+        Legacy Z-Series Recipe Creator
+    </a>
+</div>
+<script>
+    document.getElementById('style_choice').addEventListener('change', function () {
+        var parts = this.value.split('::');
+        document.getElementById('style_name').value = parts[0] || '';
+        document.getElementById('style_guide').value = parts[1] || '';
+    });
+
+    var MACHINE_PRESETS = {{ machine_presets | tojson }};
+    function renderBatchPresets() {
+        var machine = document.getElementById('wizard_machine').value;
+        var container = document.getElementById('wizard_batch_presets');
+        var presets = MACHINE_PRESETS[machine] || [];
+        container.innerHTML = '';
+        presets.forEach(function (preset, i) {
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-sm btn-outline-secondary mr-2 mb-1';
+            btn.textContent = preset.label;
+            btn.addEventListener('click', function () {
+                document.getElementById('wizard_batch_size').value = preset.value;
+                container.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+            });
+            container.appendChild(btn);
+            if (i === 0) btn.click();
+        });
+    }
+    document.getElementById('wizard_machine').addEventListener('change', renderBatchPresets);
+    renderBatchPresets();
+</script>
+{% endblock %}

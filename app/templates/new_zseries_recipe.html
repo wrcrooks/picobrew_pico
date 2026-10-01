@@ -27,8 +27,9 @@
 </form>
 <div class="table-recipe table-sm table-striped table-bordered table-light" id="t_new_recipe"></div>
 <script>
-  recipe_table['data'] = default_data;
-  var table = new Tabulator("#t_new_recipe", recipe_table);
+  zseries_recipe_table['data'] = zseries_default_data;
+  var table = new Tabulator("#t_new_recipe", zseries_recipe_table);
+  table.fixedRows = ZSERIES_FIXED_ROWS;
   subscribe_table_callbacks(table);
   tables["new_recipe"] = table;
 </script>

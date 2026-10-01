@@ -1,6 +1,9 @@
-const fixedRows = 3;
+// Prefixed to avoid colliding with zymatic_recipe.js/zseries_recipe.js when all three are
+// loaded together on the combined Library page (legacy_recipes.html) -- each machine type's
+// recipe_table/default_data/etc. must stay independently addressable there.
+var PICO_FIXED_ROWS = 3;
 
-var default_data = [
+var pico_default_data = [
     { name: "Preparing To Brew", location: "Prime", temperature: 0, step_time: 3, drain_time: 0 },
     { name: "Heating", location: "PassThru", temperature: 110, step_time: 0, drain_time: 0 },
     { name: "Dough In", location: "Mash", temperature: 110, step_time: 7, drain_time: 0 },
@@ -17,7 +20,7 @@ var idMutator = function (value, data, type, params, component) {
 	return isDataLoading ? component.getTable().getRows().length : data.id;
 }
 
-var recipe_table = {
+var pico_recipe_table = {
     movableRows: true,
     layout: "fitDataFill",
     columnDefaults:{
@@ -145,27 +148,9 @@ function getMaxID(component) {
     return maxID;
 }    
 
-function isRowMoved(row){
-	var pos = row.getPosition(true);
-	var index = row.getIndex();
-	var moved = true;
-
-	if (pos < fixedRows) {
-		row.move(fixedRows-1);
-		row.getTable().redraw(true);
-	}
-
-	if (index < fixedRows) {
-		if (index == 0) 
-			row.move(1, true);
-		else 
-			row.move(index-1);
-		moved = false;
-		row.getTable().redraw(true);
-	}
-
-	return moved;
-}
+// isRowMoved (fixed-row drag protection) now lives in base_recipe.js as a generic,
+// per-table implementation driven by table.fixedRows -- see PICO_FIXED_ROWS above and
+// where recipe_list.html/new_pico_recipe.html set it on the constructed Tabulator instance.
 
 $(document).ready(function () {
     $('.recipe_image_loader').on('change', function(element) {
@@ -203,17 +188,16 @@ $(document).ready(function () {
             contentType: "application/json; charset=UTF-8",
             success: function (data) {
                 showAlert("Success!", "success");
-                setTimeout(function () { window.location.href = "pico_recipes"; }, 2000);
+                setTimeout(function () { window.location.href = "legacy_recipes"; }, 2000);
             },
             error: function (request, status, error) {
                 showAlert(`Error: ${request.responseText}`, "danger");
-                //setTimeout(function () { window.location.href = "pico_recipes";}, 2000);
             },
         });
     });
 
-    $('#upload_recipe_file').on('change', function () {
-        upload_recipe_file('picobrew', $(this).prop('files')[0], 'pico_recipes');
+    $('#upload_recipe_file_pico').on('change', function () {
+        upload_recipe_file('picobrew', $(this).prop('files')[0], 'legacy_recipes');
     });
 
     for (element of document.getElementsByTagName("input")) {
@@ -254,7 +238,7 @@ function validate(form) {
     return valid;
 }
 
-function update_recipe(recipe_id) {
+function pico_update_recipe(recipe_id) {
     var table = Tabulator.findTable("#t_" + recipe_id)[0];
     if (table) {
         var recipe = {};
@@ -274,24 +258,23 @@ function update_recipe(recipe_id) {
             contentType: "application/json; charset=UTF-8",
             success: function (data) {
                 //showAlert("Success!", "success");
-                setTimeout(function () { window.location.href = "pico_recipes"; }, 2000);
+                setTimeout(function () { window.location.href = "legacy_recipes"; }, 2000);
             },
             error: function (request, status, error) {
                 showAlert("Error: " + request.responseText, "danger");
-                //setTimeout(function () { window.location.href = "pico_recipes";}, 2000);
             },
         });
     }
 };
 
-function download_recipe(recipe_id, recipe_name) {
+function pico_download_recipe(recipe_id, recipe_name) {
     var table = Tabulator.findTable("#t_" + recipe_id)[0];
     if (table) {
         window.location = `/recipes/picobrew/${recipe_id}/${unescapeHtml(recipe_name)}.json`;
     }
 };
 
-function clone_recipe(recipe) {
+function pico_clone_recipe(recipe) {
     recipe.id = ''
     recipe.name = `${recipe.name} (copy ${Math.floor((Math.random() * 100) + 1)})`;
     $.ajax({
@@ -303,16 +286,15 @@ function clone_recipe(recipe) {
         contentType: "application/json; charset=UTF-8",
         success: function (data) {
             showAlert("Success!", "success")
-            setTimeout(function () { window.location.href = "pico_recipes"; }, 2000);
+            setTimeout(function () { window.location.href = "legacy_recipes"; }, 2000);
         },
         error: function (request, status, error) {
             showAlert(`Error: ${request.responseText}`, "danger")
-            //setTimeout(function () { window.location.href = "pico_recipes";}, 2000);
         },
     });
 }
 
-function delete_recipe(recipe_id) {
+function pico_delete_recipe(recipe_id) {
     if (confirm("Are you sure?")) {
         $.ajax({
             url: 'delete_pico_recipe',
@@ -323,16 +305,15 @@ function delete_recipe(recipe_id) {
             contentType: "application/json; charset=UTF-8",
             success: function (data) {
                 //showAlert("Success!", "success");
-                setTimeout(function () { window.location.href = "pico_recipes"; }, 2000);
+                setTimeout(function () { window.location.href = "legacy_recipes"; }, 2000);
             },
             error: function (request, status, error) {
                 showAlert(`Error: ${request.responseText}`, "danger");
-                //setTimeout(function () { window.location.href = "pico_recipes";}, 2000);
             },
         });
     }
 };
 
-function delete_file(filename) {
-    delete_server_file(filename, 'recipe', 'pico_recipes');
+function pico_delete_file(filename) {
+    delete_server_file(filename, 'recipe', 'legacy_recipes');
 };

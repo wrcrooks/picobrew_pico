@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container" style="max-width: 600px;">
+    <h3 class="text-white mb-3">New {{ display_name }}</h3>
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    <form method="POST" action="{{ url_for('main._new_ingredient') }}">
+        <input type="hidden" name="type" value="{{ ingredient_type }}">
+        {% for field in fields %}
+        <div class="form-group mb-3">
+            <label class="text-white">{{ field['label'] }}{{ ' *' if field.get('required') }}</label>
+            {% if field['type'] == 'select' %}
+            <select class="form-control" name="{{ field['key'] }}">
+                {% for opt in field['options'] %}
+                <option value="{{ opt }}" {{ 'selected' if form.get(field['key'], field.get('default')) == opt }}>{{ opt }}</option>
+                {% endfor %}
+            </select>
+            {% else %}
+            <input type="{{ field['type'] }}" {% if field['type'] == 'number' %}step="{{ field.get('step', 'any') }}"{% endif %}
+                   class="form-control" name="{{ field['key'] }}"
+                   value="{{ form.get(field['key'], field.get('default', '')) }}"
+                   {{ 'required' if field.get('required') }}>
+            {% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-success">Add {{ display_name }}</button>
+        <a href="{{ url_for('main._ingredients') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="text-white mt-3">Pico (C/S)</h2>
+{% with recipe_type='pico', rfid_required=True, machine_ids=pico_machine_ids,
+        post_url='/import_pico_recipe', redirect_url='/legacy_recipes' %}
+    {% include "import_recipe_form.html" %}
+{% endwith %}
+<hr>
+<h2 class="text-white mt-3">Zymatic</h2>
+{% with recipe_type='zymatic', user_required=True, machine_ids=zymatic_machine_ids,
+        post_url='/import_zymatic_recipe', redirect_url='/legacy_recipes' %}
+    {% include "import_recipe_form.html" %}
+{% endwith %}
+<hr>
+<h2 class="text-white mt-3">Z Series</h2>
+{% with recipe_type='zseries', machine_ids=zseries_machine_ids,
+        post_url='/import_zseries_recipe', redirect_url='/legacy_recipes' %}
+    {% include "import_recipe_form.html" %}
+{% endwith %}
+<script src="/static/js/import_recipe.js"></script>
+{% endblock %}

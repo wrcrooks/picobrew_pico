@@ -1,11 +1,16 @@
-<div id="invalid">
+<!-- Shared by recipe list pages (which override delete_file_fn to a machine-specific
+     function, since pico_recipe.js/zymatic_recipe.js/zseries_recipe.js each define their
+     own to avoid colliding when loaded together on legacy_recipes.html) as well as
+     unrelated pages like session_history.html/ingredients.html, which rely on the default
+     plain delete_file(filename) they define themselves. -->
+<div id="invalid_{{recipe_type or 'default'}}">
     {% for file in invalid %}
     <div class="card bg-dark text-white-50">
         <h5 class="card-header" id="h_{{file}}">
         <span class="text-warning"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i></span>
         {{file}}
         <span class="text-warning"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i></span>
-        <button class="btn btn-sm btn-danger float-right mr-5" type="button" id="bd_{{file}}" onclick="event.stopPropagation();event.preventDefault();delete_file('{{file}}');"><i class="fas fa-trash"></i></button>
+        <button class="btn btn-sm btn-danger float-right mr-5" type="button" id="bd_{{file}}" onclick="event.stopPropagation();event.preventDefault();{{delete_file_fn|default('delete_file')}}('{{file}}');"><i class="fas fa-trash"></i></button>
         </a>
         </h5>
     </div>

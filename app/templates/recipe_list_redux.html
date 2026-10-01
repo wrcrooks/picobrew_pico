@@ -81,7 +81,7 @@
                           <td><strong>{{"%.3f" | format(recipe['OG'] | float)}}</strong></td>
                           <td><strong>{{"%.3f" | format(recipe['FG'] | float)}}</strong></td>
                           <td><strong>{{recipe['ibu']}}</strong></td>
-                          <td><strong>{{recipe['SRM']}}</strong> <span title="{{ SRM_COLOR_DATA[recipe['SRM']|round|int]['Name'] }}" class="p-1 rounded d-inline-block" style="background-color: {{ SRM_COLOR_DATA[recipe['SRM']|round|int]['HEX'] }};"><i class="bi bi-check-lg text-white"></i></span></td> 
+                          <td><strong>{{recipe['SRM']}}</strong> <span title="{{ (recipe['SRM']|srm_color)['Name'] }}" class="p-1 rounded d-inline-block" style="background-color: {{ (recipe['SRM']|srm_color)['HEX'] }};"><i class="bi bi-check-lg text-white"></i></span></td>
                           <td><strong>{{"%.1f" | format(recipe['abv'] | float)}}%</strong></td>
                       </tr>
                   </tbody>

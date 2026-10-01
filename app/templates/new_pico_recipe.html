@@ -58,8 +58,9 @@
 </form>
 <div class="table-recipe table-sm table-striped table-bordered table-light" id="t_new_recipe"></div>
 <script>
-  recipe_table['data'] = default_data;
-  var table = new Tabulator("#t_new_recipe", recipe_table);
+  pico_recipe_table['data'] = pico_default_data;
+  var table = new Tabulator("#t_new_recipe", pico_recipe_table);
+  table.fixedRows = PICO_FIXED_ROWS;
   tables["new_recipe"] = table;
   subscribe_table_callbacks(table);
   load_image('recipe_image', recipe_img);

@@ -1,6 +1,9 @@
-const fixedRows = 0;
+// Prefixed to avoid colliding with pico_recipe.js/zseries_recipe.js when all three are
+// loaded together on the combined Library page (legacy_recipes.html) -- each machine type's
+// recipe_table/default_data/etc. must stay independently addressable there.
+var ZYMATIC_FIXED_ROWS = 0;
 
-var default_data = [
+var zymatic_default_data = [
     { name: "Heat Mash", location: "PassThru", temperature: 152, step_time: 0, drain_time: 0 },
     { name: "Mash", location: "Mash", temperature: 152, step_time: 90, drain_time: 8 },
     { name: "Heat to Mash Out", location: "PassThru", temperature: 175, step_time: 0, drain_time: 0 },
@@ -17,7 +20,7 @@ var default_data = [
     { name: "Chill", location: "PassThru", temperature: 66, step_time: 10, drain_time: 10 },
 ];
 
-var recipe_table = {
+var zymatic_recipe_table = {
     movableRows: true,
     layout: "fitDataFill",
     columnDefaults:{
@@ -114,8 +117,8 @@ var recipe_table = {
             formatter: minusIcon, width: 49,
             cellClick: function (e, cell) {
                 cell.getRow().delete();
-                if (cell.getTable().getRows().length==fixedRows) {
-                    cell.getTable().addRow(Object.assign({},default_data[fixedRows]));
+                if (cell.getTable().getRows().length==ZYMATIC_FIXED_ROWS) {
+                    cell.getTable().addRow(Object.assign({},zymatic_default_data[ZYMATIC_FIXED_ROWS]));
                 }
             }
         },
@@ -143,17 +146,16 @@ $(document).ready(function () {
             contentType: "application/json; charset=UTF-8",
             success: function (data) {
                 showAlert("Success!", "success");
-                setTimeout(function () { window.location.href = "zymatic_recipes"; }, 2000);
+                setTimeout(function () { window.location.href = "legacy_recipes"; }, 2000);
             },
             error: function (request, status, error) {
                 showAlert("Error: " + request.responseText, "danger");
-                //setTimeout(function () { window.location.href = "zymatic_recipes";}, 2000);
             },
         });
     });
 
-    $('#upload_recipe_file').on('change', function () {
-        upload_recipe_file('zymatic', $(this).prop('files')[0], 'zymatic_recipes');
+    $('#upload_recipe_file_zymatic').on('change', function () {
+        upload_recipe_file('zymatic', $(this).prop('files')[0], 'legacy_recipes');
     });
 
     for (element of document.getElementsByTagName("input")) {
@@ -182,7 +184,7 @@ function validate(form) {
     return  true;
 }
 
-function update_recipe(recipe_id) {
+function zymatic_update_recipe(recipe_id) {
     var table = Tabulator.findTable("#t_" + recipe_id)[0];
     if (table) {
         var recipe = {};
@@ -199,24 +201,23 @@ function update_recipe(recipe_id) {
             contentType: "application/json; charset=UTF-8",
             success: function (data) {
                 //showAlert("Success!", "success");
-                setTimeout(function () { window.location.href = "zymatic_recipes"; }, 2000);
+                setTimeout(function () { window.location.href = "legacy_recipes"; }, 2000);
             },
             error: function (request, status, error) {
                 showAlert("Error: " + request.responseText, "danger");
-                //setTimeout(function () { window.location.href = "zymatic_recipes";}, 2000);
             },
         });
     }
 };
 
-function download_recipe(recipe_id, recipe_name) {
+function zymatic_download_recipe(recipe_id, recipe_name) {
     var table = Tabulator.findTable("#t_" + recipe_id)[0];
     if (table) {
         window.location = '/recipes/zymatic/' + recipe_id + '/' + unescapeHtml(recipe_name) + '.json';
     }
 };
 
-function clone_recipe(recipe) {
+function zymatic_clone_recipe(recipe) {
     recipe.id = ''
     recipe.name = recipe.name + " (copy " + Math.floor((Math.random() * 100) + 1) + ")";
     $.ajax({
@@ -228,16 +229,15 @@ function clone_recipe(recipe) {
         contentType: "application/json; charset=UTF-8",
         success: function (data) {
             showAlert("Success!", "success")
-            setTimeout(function () { window.location.href = "zymatic_recipes"; }, 2000);
+            setTimeout(function () { window.location.href = "legacy_recipes"; }, 2000);
         },
         error: function (request, status, error) {
             showAlert("Error: " + request.responseText, "danger");
-            //setTimeout(function () { window.location.href = "zymatic_recipes";}, 2000);
         },
     });
 }
 
-function delete_recipe(recipe_id) {
+function zymatic_delete_recipe(recipe_id) {
     if (confirm("Are you sure?")) {
         $.ajax({
             url: 'delete_zymatic_recipe',
@@ -248,16 +248,15 @@ function delete_recipe(recipe_id) {
             contentType: "application/json; charset=UTF-8",
             success: function (data) {
                 //showAlert("Success!", "success");
-                setTimeout(function () { window.location.href = "zymatic_recipes"; }, 2000);
+                setTimeout(function () { window.location.href = "legacy_recipes"; }, 2000);
             },
             error: function (request, status, error) {
                 showAlert("Error: " + request.responseText, "danger");
-                //setTimeout(function () { window.location.href = "zymatic_recipes";}, 2000);
             },
         });
     }
 };
 
-function delete_file(filename) {
-    delete_server_file(filename, 'recipe', 'zymatic_recipes');
+function zymatic_delete_file(filename) {
+    delete_server_file(filename, 'recipe', 'legacy_recipes');
 };

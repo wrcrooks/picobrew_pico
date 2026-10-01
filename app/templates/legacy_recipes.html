@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<script src="/static/js/server_management.js"></script>
+<script src="/static/js/convert_units.js"></script>
+<script src="/static/js/pico_image.js"></script>
+<script src="/static/js/base_recipe.js"></script>
+<script src="/static/js/pico_recipe.js"></script>
+<script src="/static/js/zymatic_recipe.js"></script>
+<script src="/static/js/zseries_recipe.js"></script>
+<script src="/static/js/showdown/showdown.min.js"></script>
+<script src="/static/js/recipe_markdown.js"></script>
+<script>var tables = {};</script>
+{% include "units_selector.html" %}
+
+<h2 class="text-white mt-3">Pico (C/S)</h2>
+{% with recipe_type='pico', delete_file_fn='pico_delete_file', recipes=pico_recipes, invalid=invalid_pico %}
+    {% include "recipe_actions.html" %}
+    {% include "invalid_file.html" %}
+    {% include "recipe_list.html" %}
+{% endwith %}
+<hr>
+
+<h2 class="text-white mt-3">Zymatic</h2>
+{% with recipe_type='zymatic', delete_file_fn='zymatic_delete_file', recipes=zymatic_recipes, invalid=invalid_zymatic %}
+    {% include "recipe_actions.html" %}
+    {% include "invalid_file.html" %}
+    {% include "recipe_list.html" %}
+{% endwith %}
+<hr>
+
+<h2 class="text-white mt-3">Z Series</h2>
+{% with recipe_type='zseries', delete_file_fn='zseries_delete_file', recipes=zseries_recipes, invalid=invalid_zseries %}
+    {% include "recipe_actions.html" %}
+    {% include "invalid_file.html" %}
+    {% include "recipe_list.html" %}
+{% endwith %}
+{% endblock %}

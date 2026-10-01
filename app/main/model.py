@@ -6,6 +6,30 @@ import json
 from .config import (MachineType, brew_archive_sessions_path, ferm_archive_sessions_path,
                      still_archive_sessions_path, iSpindel_archive_sessions_path, tilt_archive_sessions_path)
 
+# Standard finished-beer batch sizes per machine, sourced from this project's own docs.
+# Pico C/S: NOT 2.5 gal -- that figure belonged to Zymatic/Z-Series and was mistakenly
+# reused here (the local recipe corpus that seemed to support it is itself Z-Series/Redux
+# format, not Pico). The Pico Brewing Keg holds 1.75 gal
+# (app/static/support/legacy/pico-s/Frequently-Asked-Questions.md), and the Pico Instruction
+# Manual's own brewing steps (Pico_Manual.pdf, "Let's Brew" step 3) have the user charge the
+# Brewing Keg with exactly "1 gallon plus 6 cups" (1.375 gal) of distilled water via the
+# Racking Tube gauge before brewing -- no larger figure appears anywhere in the manual.
+# 1.25 gal is used as the practical default: below the 1.375 gal charge and well under the
+# 1.75 gal keg capacity, accounting for trub/fermentation losses.
+# Zymatic ("up to 2.5 gallons of finished beer per batch") and Z Series Z1/Z2/Z4 = 2.5/5/10
+# gallons both come from their own Frequently-Asked-Questions.md docs. "Custom" has no
+# presets -- it's an escape hatch for any other batch size, not a fixed value.
+MACHINE_BATCH_PRESETS = {
+    'Pico C/S': [{'label': '1.25 gal', 'value': 1.25}],
+    'Zymatic': [{'label': '2.5 gal', 'value': 2.5}],
+    'Z Series': [
+        {'label': 'Z1 - 2.5 gal', 'value': 2.5},
+        {'label': 'Z2 - 5 gal', 'value': 5.0},
+        {'label': 'Z4 - 10 gal', 'value': 10.0},
+    ],
+    'Custom': [],
+}
+
 ZYMATIC_LOCATION = {
     'PassThru': '0',
     'Mash': '1',
