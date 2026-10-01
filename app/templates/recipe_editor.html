@@ -10,6 +10,7 @@
 <script src="/static/js/recipe_ingredients.js"></script>
 <script>var tables = {};</script>
 <script>window.MACHINE_BATCH_PRESETS = {{ machine_presets | tojson }};</script>
+<script>window.MACHINE_FIXED_WATER = {{ machine_fixed_water | tojson }};</script>
 <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.js"></script>
 <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.25/js/dataTables.bootstrap5.js"></script>
@@ -206,7 +207,7 @@
                 <div class="d-flex align-items-center flex-wrap mb-1 ml-1" id="machine-batch-presets"></div>
                 <div class="d-flex align-items-center mb-1 ml-1">
                     <b class="text-muted mr-2">Starting Water (gal):</b>
-                    <input type="number" step="0.01" class="form-control form-control-sm" style="max-width:100px;" id="input-h2o" name="H2O" value="{{ '%.2f' | format(recipe['H2O'] | float) }}">
+                    <input type="number" step="0.001" class="form-control form-control-sm" style="max-width:100px;" id="input-h2o" name="H2O" value="{{ '%g' | format(recipe['H2O'] | float) }}">
                     <span class="text-muted small ml-2" id="h2o-lbs">({{ '%.2f' | format((recipe['H2O'] | float) * 8.34) }} lbs)</span>
                 </div>
                 <div class="d-flex align-items-center mb-1 ml-1">
@@ -611,9 +612,9 @@
                 <div class="d-flex align-items-center mb-1 ml-1">
                     <b class="text-muted mr-2">Fermentation Type:</b>
                     <select class="form-control form-control-sm" style="max-width:180px;" name="FermentationType">
-                        <option value="0" {{ 'selected' if recipe['FermentationType'] == 0 }}>Ale</option>
-                        <option value="1" {{ 'selected' if recipe['FermentationType'] == 1 }}>Lager</option>
-                        <option value="2" {{ 'selected' if recipe['FermentationType'] == 2 }}>Advanced/Custom</option>
+                        {% for code, label in fermentation_types.items() %}
+                        <option value="{{ code }}" {{ 'selected' if recipe['FermentationType'] == code }}>{{ label }}</option>
+                        {% endfor %}
                     </select>
                 </div>
             </div>

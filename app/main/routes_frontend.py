@@ -24,7 +24,7 @@ from .session_parser import (_paginate_sessions, list_session_files,
                              get_brew_graph_data, get_ferm_graph_data, get_still_graph_data, get_iSpindel_graph_data, get_tilt_graph_data,
                              active_brew_sessions, active_ferm_sessions, active_still_sessions, active_iSpindel_sessions, active_tilt_sessions,
                              add_invalid_session, get_invalid_sessions, load_brew_sessions)
-from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION, SRM_COLOR_DATA, LOVIBOND_COLOR_DATA, bjcp_2008_substyles, MACHINE_BATCH_PRESETS
+from .model import PICO_LOCATION, ZYMATIC_LOCATION, ZSERIES_LOCATION, SRM_COLOR_DATA, LOVIBOND_COLOR_DATA, bjcp_2008_substyles, MACHINE_BATCH_PRESETS, MACHINE_FIXED_WATER_GAL, FERMENTATION_TYPES
 
 file_glob_pattern = "[!._]*.json"
 yaml = YAML()
@@ -556,6 +556,8 @@ def _recipe(args):
     for s in recipe['MachineSteps']:
         for m in range(s['Time']):
             wortCurveData.append(int(s['Temperature']))
+    derived = recipe_derived_values(recipe)
+    fill_default_instructions(recipe)
     for s in range(len(recipe['Hops'])):
         for k in ZSERIES_LOCATION.keys():
             if ZSERIES_LOCATION[k] == str(recipe['Hops'][s]['Location']):
@@ -572,7 +574,7 @@ def _recipe(args):
         for k in ZSERIES_LOCATION.keys():
             if ZSERIES_LOCATION[k] == str(recipe['MachineSteps'][s]['StepLocation']):
                 recipe['MachineSteps'][s]['StepLocation'] = k.replace("Adjunct", "Adjunct ").replace("PassThru", "Pass Through")
-    return render_template_with_defaults('recipe_viewer.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData)
+    return render_template_with_defaults('recipe_viewer.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, fermentation_types=FERMENTATION_TYPES, **derived)
 
 # Constants and algorithm ported exactly from picobrew.com's own Crafter JS
 # (getBrewGraphData/minutesToTimeString) so the estimate matches the live site bit-for-bit,
@@ -625,6 +627,35 @@ def estimate_recipe_brew_chill_time(recipe):
                 current_time += step['Drain']
 
     return minutes_to_time_string(round(current_time)), minutes_to_time_string(round(chill_time))
+
+
+def recipe_derived_values(recipe):
+    """Display-only values computed from a recipe, shared by the viewer and editor pages.
+    Expects raw (numeric) MachineSteps StepLocation codes -- call before any display mapping.
+
+    pre_hop_boil_time matches picobrew's own Crafter JS exactly (getMaxBoilStepTime(): the boil
+    runs BoilTime minutes total, and this is how long it ran before its longest-boiled hop or
+    boil adjunct went in). whirlpool_time mirrors that same "longest thing added" shape for the
+    whirlpool stage (no reference implementation available for this one)."""
+    max_boil_step_time = max([h['Time'] for h in recipe['Hops']] +
+                             [a['Time'] for a in recipe['Adjuncts']], default=0)
+    whirlpool_time = max([s['Time'] for s in recipe['WhirlpoolSteps']] +
+                         [h['Time'] for h in recipe['WhirlpoolHops']] +
+                         [a['Time'] for a in recipe['WhirlpoolAdjuncts']], default=0)
+    brew_time, chill_time = estimate_recipe_brew_chill_time(recipe)
+    return {
+        'pre_hop_boil_time': recipe['BoilTime'] - max_boil_step_time,
+        'whirlpool_time': whirlpool_time,
+        'brew_time': brew_time,
+        'chill_time': chill_time,
+    }
+
+
+def fill_default_instructions(recipe):
+    if not recipe.get('BrewingInstructionsText'):
+        recipe['BrewingInstructionsText'] = build_default_brewing_instructions(recipe)
+    if not recipe.get('FermentationInstructionsText'):
+        recipe['FermentationInstructionsText'] = build_default_fermentation_instructions(recipe)
 
 
 def build_default_brewing_instructions(recipe):
@@ -823,7 +854,7 @@ def generate_recipe_from_style(style, batch_size, suggestions, machine='Custom')
         f['Amount'] = round(f['Amount'] * scale_ratio, 2)
     for h in hops:
         h['Amount'] = round(h['Amount'] * scale_ratio, 2)
-    h2o = round(BASELINE_BATCH * 1.43 * scale_ratio, 2)
+    h2o = MACHINE_FIXED_WATER_GAL.get(machine, round(BASELINE_BATCH * 1.43 * scale_ratio, 2))
 
     mash_steps = [{'Name': 'Single Step Infusion Mash', 'Temp': 152.0, 'Time': 60.0, 'Style': 'Infusion', 'Errors': []}]
     boil_steps = [
@@ -955,35 +986,12 @@ def _recipe_edit(rfid):
     # code (not converted to a display string) so the editable <select> in
     # recipe_editor.html can mark the right option selected.
 
-    if not recipe.get('BrewingInstructionsText'):
-        recipe['BrewingInstructionsText'] = build_default_brewing_instructions(recipe)
-    if not recipe.get('FermentationInstructionsText'):
-        recipe['FermentationInstructionsText'] = build_default_fermentation_instructions(recipe)
+    fill_default_instructions(recipe)
 
     location_options = [(v, k.replace('Adjunct', 'Adjunct ').replace('PassThru', 'Pass Through'))
                          for k, v in ZSERIES_LOCATION.items()]
 
-    # pre_hop_boil_time matches picobrew's own Crafter JS exactly (getMaxBoilStepTime(): the boil
-    # runs BoilTime minutes total, and this is how long it ran before its longest-boiled hop or
-    # boil adjunct went in). whirlpool_time mirrors that same "longest thing added" shape for the
-    # whirlpool stage (no reference implementation available for this one).
-    max_boil_step_time = max([h['Time'] for h in recipe['Hops']] +
-                              [a['Time'] for a in recipe['Adjuncts']], default=0)
-    pre_hop_boil_time = recipe['BoilTime'] - max_boil_step_time
-    whirlpool_time = max([s['Time'] for s in recipe['WhirlpoolSteps']] +
-                          [h['Time'] for h in recipe['WhirlpoolHops']] +
-                          [a['Time'] for a in recipe['WhirlpoolAdjuncts']], default=0)
-    brew_time, chill_time = estimate_recipe_brew_chill_time(recipe)
-
-    return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, bjcp_2008_substyles=bjcp_2008_substyles, location_options=location_options, pre_hop_boil_time=pre_hop_boil_time, whirlpool_time=whirlpool_time, brew_time=brew_time, chill_time=chill_time, machine_presets=MACHINE_BATCH_PRESETS)
-
-@main.route('/api/modifyRecipe', methods=['POST'])
-def _api_modifyRecipe():
-    data = request.get_json()
-    data = data.replace("&#39;", '"').replace(": None", ': null').replace(': True', ': true').replace(': False', ': false').replace('\n', '\\n')
-    data = json.loads(data)
-    print(data)
-    return '', 204
+    return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, bjcp_2008_substyles=bjcp_2008_substyles, location_options=location_options, machine_presets=MACHINE_BATCH_PRESETS, machine_fixed_water=MACHINE_FIXED_WATER_GAL, fermentation_types=FERMENTATION_TYPES, **recipe_derived_values(recipe))
 
 @main.route('/recipe/clone/<rfid>', methods=['GET'])
 def _recipe_clone(rfid):

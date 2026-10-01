@@ -30,6 +30,20 @@ MACHINE_BATCH_PRESETS = {
     'Custom': [],
 }
 
+# Machines whose starting water is fixed by the hardware rather than proportional to batch
+# size: the Pico's Brewing Keg is always charged to the Racking Tube gauge, "1 gallon plus
+# 6 cups" (Pico_Manual.pdf, "Let's Brew"), so scaling a recipe must not scale its water.
+MACHINE_FIXED_WATER_GAL = {
+    'Pico C/S': 1.375,
+}
+
+# Recipe FermentationType codes
+FERMENTATION_TYPES = {
+    0: 'Ale',
+    1: 'Lager',
+    2: 'Advanced/Custom',
+}
+
 ZYMATIC_LOCATION = {
     'PassThru': '0',
     'Mash': '1',

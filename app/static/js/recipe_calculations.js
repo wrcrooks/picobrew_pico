@@ -146,7 +146,9 @@ window.recomputeRecipeStats = recomputeRecipeStats;
 // Item 3: scaling every ingredient Amount and the batch volume (BatchSize/H2O) by the same
 // ratio leaves concentration-based stats (OG/FG/SRM/IBU/ABV) unchanged, since each row's
 // stored PotentialGravity/ColorPts/IBU already represents Amount/BatchSize -- so those points
-// fields need no adjustment at all, only the raw weights and volumes do.
+// fields need no adjustment at all, only the raw weights and volumes do. The exception is a
+// machine with hardware-fixed starting water (MACHINE_FIXED_WATER_GAL in model.py), whose
+// water is set to that fixed amount instead of scaled.
 function scaleRecipeTo(target) {
     var batchSizeInput = document.getElementById('input-batchsize');
     if (!batchSizeInput) return;
@@ -160,7 +162,12 @@ function scaleRecipeTo(target) {
     batchSizeInput.value = target.toFixed(2);
     var h2oInput = document.querySelector('input[name="H2O"]');
     if (h2oInput) {
-        h2oInput.value = ((parseFloat(h2oInput.value) || 0) * ratio).toFixed(2);
+        var machineSelect = document.getElementById('input-machine');
+        var fixedWater = machineSelect && window.MACHINE_FIXED_WATER
+            ? window.MACHINE_FIXED_WATER[machineSelect.value] : undefined;
+        h2oInput.value = fixedWater !== undefined
+            ? String(fixedWater)
+            : ((parseFloat(h2oInput.value) || 0) * ratio).toFixed(2);
     }
     recomputeRecipeStats();
 }
