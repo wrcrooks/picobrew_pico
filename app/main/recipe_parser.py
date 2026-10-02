@@ -402,6 +402,14 @@ def PicoBrewRecipeImport(recipe, rfid=None):
             json.dump(r, file, indent=4, sort_keys=True)
 
 
+def zymatic_safe_name(text):
+    """The Zymatic's recipe string is '/'-, ',' and '|'-delimited (and '#'-framed), so those
+    characters can't appear in recipe or step names."""
+    for ch in '/|,#':
+        text = text.replace(ch, '-')
+    return text
+
+
 class ReduxRecipe():
     def __init__(self):
         self.id = None
@@ -574,19 +582,13 @@ class ReduxRecipe():
         return steps
 
     def to_zymatic_recipe(self):
-        """The Zymatic's recipe string is '/'-, ',' and '|'-delimited (and '#'-framed), so
-        those characters can't appear in names. Zymatic and Z-Series share location codes."""
-        def clean(text):
-            for ch in '/|,#':
-                text = text.replace(ch, '-')
-            return text
-
+        """Zymatic and Z-Series share location codes."""
         zymatic = ZymaticRecipe()
         zymatic.id = self.id
-        zymatic.name = clean(self.name)
+        zymatic.name = zymatic_safe_name(self.name)
         zymatic.steps = self._machine_steps(ZymaticRecipeStep)
         for step in zymatic.steps:
-            step.name = clean(step.name)
+            step.name = zymatic_safe_name(step.name)
         return zymatic
 
     def to_zseries_recipe(self):

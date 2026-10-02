@@ -18,7 +18,7 @@ from .config import (MachineType, SessionType, recipe_path,
 from .frontend_common import render_template_with_defaults
 from .recipe_import import import_recipes
 from .recipe_conditions import condition_charts
-from .recipe_parser import PicoBrewRecipe, ZymaticRecipe, ZSeriesRecipe, ReduxRecipe
+from .recipe_parser import PicoBrewRecipe, ZymaticRecipe, ZSeriesRecipe, ReduxRecipe, zymatic_safe_name
 from .session_parser import (_paginate_sessions, list_session_files,
                              load_ferm_session, load_still_session, load_iSpindel_session, load_tilt_session,
                              dirty_sessions_since_clean, last_session_metadata, BrewSessionType,
@@ -292,6 +292,38 @@ def recipe_dirpath(machine_type):
     return dirpath
 
 
+def upload_unified_recipe(file):
+    """Adds an uploaded recipe-builder JSON file (picobrew's own recipe export format). Saved
+    under its recipe name like any builder recipe; never overwrites an existing recipe."""
+    if not allowed_extension(file.filename):
+        return f'unsupported file : {file.filename}', 400
+    try:
+        raw = json.loads(file.read().decode('utf-8'))
+        name = (raw['VM']['Recipe']['Name'] or '').strip()
+        guid = raw['RecipeGUID']
+    except (ValueError, UnicodeDecodeError, KeyError, TypeError):
+        return 'Not a recipe builder file (expected RecipeGUID and VM.Recipe.Name)', 400
+    if not name or not isinstance(guid, str) or len(guid) != 32 or any(c not in '0123456789abcdefABCDEF' for c in guid):
+        return 'Recipe needs a name and a 32-character hexadecimal RecipeGUID', 400
+
+    existing = load_redux_recipes()
+    if any(r.id == guid for r in existing):
+        return 'A recipe with this RecipeGUID already exists - clone it instead to make a copy', 409
+    target = recipe_filename(name)
+    if any(r.name == name for r in existing) or target.exists():
+        return f'A recipe named "{name}" already exists', 409
+
+    with open(target, 'w') as f:
+        json.dump(raw, f, indent=4, sort_keys=True)
+    try:
+        ReduxRecipe().parse(target)
+    except Exception as e:
+        os.remove(target)
+        current_app.logger.warning(f'rejected uploaded recipe "{name}": {e!r}')
+        return 'Recipe file is missing fields the recipe builder needs', 400
+    return f'Uploaded "{name}"', 201
+
+
 @main.route('/recipes/<machine_type>', methods=['POST'])
 def upload_file(machine_type):
     # check if the post request has the file part
@@ -304,6 +336,8 @@ def upload_file(machine_type):
     if file.filename == '':
         current_app.logger.error('invalid input : no selected file')
         return 'no selected file', 400
+    if machine_type == 'unified':
+        return upload_unified_recipe(file)
     if file and allowed_extension(file.filename):
         filename = secure_filename(file.filename).replace(' ', '_')
         dirpath = recipe_dirpath(machine_type)
@@ -519,17 +553,44 @@ def srm_color_filter(value):
     return SRM_COLOR_DATA[nearest]
 main.add_app_template_filter(srm_color_filter, 'srm_color')
 
+def recipe_brew_history(recipes):
+    """{recipe id: (completed brew count, last brew datetime or None)}, from archived brew
+    session filenames alone: 'date#machine#session-or-tag#encoded-name[#type].json'. A session
+    belongs to a recipe when its encoded name matches the recipe's (the Zymatic is sent a
+    delimiter-safe name, so that form counts too) or, for a Pico, its tag field is the
+    recipe's TagID. Names are compared encoded because decoding '_' back to ' ' is lossy."""
+    def encode(name):
+        return name.replace(' ', '_').replace('#', '%23')
+
+    sessions = []
+    for f in list_session_files(brew_archive_sessions_path()):
+        info = f.stem.split('#')
+        if len(info) < 4:
+            continue
+        try:
+            started = datetime.strptime(info[0], '%Y%m%d_%H%M%S')
+        except ValueError:
+            continue
+        sessions.append((started, info[2], info[3]))
+
+    history = {}
+    for r in recipes:
+        names = {encode(r.name), encode(zymatic_safe_name(r.name))}
+        brewed = [started for started, tag_or_session, name in sessions
+                  if name in names or (r.TagID and tag_or_session == r.TagID)]
+        history[r.id] = (len(brewed), max(brewed) if brewed else None)
+    return history
+
+
 @main.route('/recipes')
 def _recipes():
     global redux_recipes, invalid_recipes
     redux_recipes = load_redux_recipes()
-    for r in redux_recipes:
-        for s in brew_sessions:
-            print(s['alias'])
-            #TODO: Get recipe brew count and last brew date
+    history = recipe_brew_history(redux_recipes)
     recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
     for d, recipe in zip(recipes_dict, redux_recipes):
         d['machine_problems'] = recipe.machine_problems()
+        d['brew_count'], d['last_brewed'] = history[recipe.id]
     return render_template_with_defaults('redux_recipes.html', recipes=recipes_dict, invalid=invalid_recipes.get(MachineType.ZSERIES, set()), SRM_COLOR_DATA=SRM_COLOR_DATA)
 
 #   Recipe: /API/pico/getRecipe?rfid={rfid}

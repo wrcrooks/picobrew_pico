@@ -8,9 +8,46 @@
 <script>var tables = {};</script>
 <!-- {% include "units_selector.html" %} -->
 {% with recipe_type='pico', delete_file_fn='pico_delete_file' %}
-    {% include "recipe_actions.html" %}
+    <div class="container mt-3 mb-3">
+        <a class="btn btn-sm btn-success mr-3" href="{{ url_for('main._recipe_new_from_style') }}" role="button">
+            <i class="fas fa-plus"></i> New Recipe
+        </a>
+        <label class="btn btn-sm btn-primary mb-0" for="upload-builder-recipe">
+            <i class="fas fa-upload"></i> Upload Recipe
+        </label>
+        <input id="upload-builder-recipe" type="file" accept=".json,application/json" class="d-none">
+        <div id="upload-status" class="alert mt-3 mb-0" role="status" hidden></div>
+    </div>
+    <script>
+        (function () {
+            var input = document.getElementById('upload-builder-recipe');
+            var status = document.getElementById('upload-status');
+            function show(text, kind) {
+                status.textContent = text;
+                status.className = 'alert mt-3 mb-0 alert-' + kind;
+                status.hidden = false;
+            }
+            input.addEventListener('change', function () {
+                var file = input.files[0];
+                input.value = '';
+                if (!file) return;
+                var form = new FormData();
+                form.append('recipe', file);
+                show('Uploading ' + file.name + '…', 'info');
+                fetch('/recipes/unified', { method: 'POST', body: form })
+                    .then(function (resp) {
+                        return resp.text().then(function (text) { return { ok: resp.ok, text: text }; });
+                    })
+                    .then(function (result) {
+                        if (!result.ok) { show('Upload failed: ' + result.text, 'danger'); return; }
+                        show(result.text, 'success');
+                        setTimeout(function () { window.location.reload(); }, 1200);
+                    })
+                    .catch(function (err) { show('Upload failed: ' + err.message, 'danger'); });
+            });
+        })();
+    </script>
     {% include "invalid_file.html" %}
-    <!-- <br /><br /><br /> -->
     {% include "recipe_list_redux.html" %}
 {% endwith %}
 {% endblock %}
