@@ -65,7 +65,10 @@ async function refreshList() {
     return li;
   }));
   $('#no-devices').hidden = state.devices.length > 0;
-  if (!state.selected && state.devices.length) select(state.devices[0].id);
+  if (!state.selected && state.devices.length) {
+    const linked = (location.hash.match(/device=(\w+)/) || [])[1];
+    select(state.devices.some((d) => d.id === linked) ? linked : state.devices[0].id);
+  }
   if (state.selected && !state.devices.some((d) => d.id === state.selected)) select(null);
 }
 
@@ -75,6 +78,8 @@ function select(id) {
   state.history = [];
   state.lastT = null;
   state.paksKey = null;
+  state.menuKey = null;
+  state.programsKey = null;
   $('#device-view').hidden = !id;
   $('#empty-view').hidden = !!id;
   refreshList();
@@ -135,7 +140,16 @@ function render(s) {
   if (s.last_comm_error) badges.push(badge('Server unreachable', 'bad'));
   if (s.program && s.program.user_paused) badges.push(badge('Paused', 'warn'));
   if (s.program && s.program.phase === 'waiting') badges.push(badge('Waiting at Pause step', 'warn'));
+  if (s.dirty_sessions != null) badges.push(badge(`${s.dirty_sessions} session(s) since clean`, 'off'));
+  const resumable = s.resumable_session_id != null && s.resumable_session_id !== -1;
+  if (resumable && !s.program) badges.push(badge(`Resumable session ${s.resumable_session_id}`, 'warn'));
   $('#d-badges').replaceChildren(...badges);
+
+  const caps = new Set(s.capabilities);
+  document.querySelectorAll('[data-capability]').forEach((el) => { el.hidden = !caps.has(el.dataset.capability); });
+  $('#t-therm-label').textContent = $('#legend-therm').textContent = s.protocol === 'zymatic' ? 'Heater' : 'Thermoblock';
+  renderPrograms(s);
+  renderMenu(s);
 
   $('#btn-power').textContent = s.powered ? 'Power off' : 'Power on';
   const running = !!s.program;
@@ -143,6 +157,8 @@ function render(s) {
   document.querySelectorAll('[data-needs-idle]').forEach((b) => { b.disabled = !s.powered || running; });
   document.querySelectorAll('[data-needs-run]').forEach((b) => { b.disabled = !running; });
   $('#btn-error').disabled = !s.powered;
+  $('#btn-resume-session').disabled = !s.powered || running || !resumable;
+  $('#resume-hint').textContent = resumable ? '' : 'Server reported no resumable session at boot';
   const speedSel = $('#speed');
   if (document.activeElement !== speedSel) speedSel.value = String(s.speed);
 
@@ -158,7 +174,40 @@ function render(s) {
   renderTraffic(s);
 }
 
+function renderPrograms(s) {
+  const key = JSON.stringify(s.programs);
+  if (key === state.programsKey) return;
+  state.programsKey = key;
+  const container = $('#program-buttons');
+  container.querySelectorAll('[data-program]').forEach((b) => b.remove());
+  for (const p of s.programs) {
+    const b = el('button', { textContent: p.label });
+    b.dataset.program = p.key;
+    b.dataset.needsIdle = '';
+    b.addEventListener('click', () => command('start_program', { program: p.key }));
+    container.append(b);
+  }
+}
+
+function renderMenu(s) {
+  if (!s.menu) return;
+  const key = JSON.stringify(s.menu);
+  if (key === state.menuKey) return;
+  state.menuKey = key;
+  const sel = $('#menu-select');
+  const previous = sel.value;
+  const groups = new Map();
+  for (const m of s.menu) {
+    if (!groups.has(m.group)) groups.set(m.group, el('optgroup', { label: m.group }));
+    groups.get(m.group).append(el('option', { value: m.id, textContent: m.name }));
+  }
+  const placeholder = el('option', { value: '', textContent: s.menu.length ? 'Choose a recipe…' : 'Menu is empty' });
+  sel.replaceChildren(placeholder, ...groups.values());
+  if (s.menu.some((m) => m.id === previous)) sel.value = previous;
+}
+
 function renderPaks(s) {
+  if (!s.paks) return;
   const key = JSON.stringify(s.paks);
   if (key === state.paksKey) return;
   state.paksKey = key;
@@ -171,7 +220,8 @@ function renderPaks(s) {
 function renderSteps(s) {
   const steps = s.program ? s.program.steps : (s.recipe ? s.recipe.steps : []);
   $('#program-title').textContent = s.program ? s.program.label
-    : s.recipe ? `Recipe: ${s.recipe.name} (ABV ${s.recipe.abv}%, IBU ${s.recipe.ibu})` : 'Recipe';
+    : s.recipe ? `Recipe: ${s.recipe.name}` + (s.recipe.abv != null ? ` (ABV ${s.recipe.abv}%, IBU ${s.recipe.ibu})` : '')
+      + (s.recipe.start_water ? ` · start water ${s.recipe.start_water} L` : '') : 'Recipe';
   $('#steps-empty').hidden = steps.length > 0;
   $('#steps-body').replaceChildren(...steps.map((st, i) => {
     let cls = '';
@@ -210,7 +260,8 @@ function renderOled(s) {
   } else if (s.recipe) {
     lines.push(s.recipe.name, `${s.recipe.steps.length} steps`, 'Ready to brew');
   } else {
-    lines.push(s.needs_cleaning ? 'Deep clean needed' : 'Ready', 'Insert PicoPak', `W ${Math.round(s.wort)}F`);
+    lines.push(s.needs_cleaning ? 'Clean needed' : 'Ready', s.protocol === 'pico' ? 'Insert PicoPak' : 'Select a recipe',
+      `W ${Math.round(s.wort)}F`);
   }
   ctx.fillStyle = '#fff';
   ctx.font = '10px monospace';
@@ -308,6 +359,12 @@ $('#btn-insert').addEventListener('click', () => {
   command('insert_pak', { rfid }).then((snap) => {
     if (snap && !snap.recipe && snap.events.length) toast(snap.events[0].text);
   });
+});
+
+$('#btn-select-recipe').addEventListener('click', () => {
+  const recipeId = $('#menu-select').value;
+  if (!recipeId) return toast('Choose a recipe from the menu');
+  command('select_recipe', { recipe_id: recipeId });
 });
 
 $('#btn-sous-vide').addEventListener('click', () =>

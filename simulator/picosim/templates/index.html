@@ -26,7 +26,7 @@
         </select>
       </label>
       <label>Name <input name="name" placeholder="e.g. Kitchen Pico"></label>
-      <label>UID <input name="uid" placeholder="random 32-char if blank" maxlength="64"></label>
+      <label>UID <input name="uid" placeholder="random if blank" maxlength="64"></label>
       <label>Firmware <input name="firmware" placeholder="model default"></label>
       <label>Server URL <input name="server_url" placeholder="{{ default_server_url }}"></label>
       <button type="submit" class="primary">Add</button>
@@ -54,31 +54,45 @@
         <canvas id="oled" width="128" height="64"></canvas>
         <div class="temps">
           <div><span class="label">Wort</span><span id="t-wort" class="big"></span></div>
-          <div><span class="label">Thermoblock</span><span id="t-therm" class="big"></span></div>
+          <div><span class="label" id="t-therm-label">Thermoblock</span><span id="t-therm" class="big"></span></div>
           <div><span class="label">Time left</span><span id="t-left" class="big"></span></div>
         </div>
 
-        <h4>PicoPak</h4>
-        <div class="row">
-          <select id="pak-select"></select>
-          <button data-cmd="refresh_paks" data-needs-power title="Re-query getAssociatedPaks">&#x21bb;</button>
+        <div data-capability="paks">
+          <h4>PicoPak</h4>
+          <div class="row">
+            <select id="pak-select"></select>
+            <button data-cmd="refresh_paks" data-needs-power title="Re-query getAssociatedPaks">&#x21bb;</button>
+          </div>
+          <div class="row">
+            <input id="rfid-input" placeholder="or type any RFID / tag ID" maxlength="64">
+            <button id="btn-insert" data-needs-idle>Insert</button>
+            <button data-cmd="eject_pak" data-needs-idle>Eject</button>
+          </div>
         </div>
-        <div class="row">
-          <input id="rfid-input" placeholder="or type any RFID / tag ID" maxlength="64">
-          <button id="btn-insert" data-needs-idle>Insert</button>
-          <button data-cmd="eject_pak" data-needs-idle>Eject</button>
+
+        <div data-capability="menu">
+          <h4>Recipe menu</h4>
+          <div class="row">
+            <select id="menu-select"></select>
+            <button data-cmd="refresh_menu" data-needs-power title="Re-sync the recipe menu from the server">&#x21bb;</button>
+            <button id="btn-select-recipe" data-needs-idle>Select</button>
+          </div>
         </div>
 
         <h4>Programs</h4>
-        <div class="row">
+        <div class="row" id="program-buttons">
           <button data-cmd="start_brew" data-needs-idle class="primary">Start brew</button>
-          <button data-cmd="start_deep_clean" data-needs-idle>Deep clean</button>
-          <button data-cmd="start_rinse" data-needs-idle>Rinse</button>
         </div>
-        <div class="row">
+        <div class="row" data-capability="sous_vide">
           <input id="sv-temp" type="number" value="135" min="80" max="208" title="Sous vide temperature (F)"> &deg;F
           <input id="sv-min" type="number" value="90" min="1" max="2880" title="Sous vide minutes"> min
           <button id="btn-sous-vide" data-needs-idle>Sous vide</button>
+        </div>
+        <div class="row" data-capability="resume">
+          <button data-cmd="resume_session" id="btn-resume-session" data-needs-idle
+                  title="Pick up the session the server reported as resumable at boot">Resume session</button>
+          <span class="muted small" id="resume-hint"></span>
         </div>
 
         <h4>Run control</h4>
@@ -110,7 +124,7 @@
         </div>
         <div class="row">
           <button data-cmd="check_firmware" data-needs-power>Check firmware</button>
-          <button data-cmd="download_firmware" data-needs-power>Download firmware</button>
+          <button data-cmd="download_firmware" data-needs-power data-capability="firmware_download">Download firmware</button>
         </div>
       </section>
 
@@ -126,7 +140,7 @@
 
         <h3>Temperature</h3>
         <canvas id="chart" height="220"></canvas>
-        <div class="legend"><span class="sw wort"></span>Wort <span class="sw therm"></span>Thermoblock <span class="sw target"></span>Step change</div>
+        <div class="legend"><span class="sw wort"></span>Wort <span class="sw therm"></span><span id="legend-therm">Thermoblock</span> <span class="sw target"></span>Step change</div>
 
         <h3>Settings</h3>
         <form id="settings" class="settings">

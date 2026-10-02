@@ -9,17 +9,26 @@ def manager():
     return current_app.config['DEVICE_MANAGER']
 
 
+def supported(device, method):
+    fn = getattr(device, method, None)
+    if fn is None:
+        raise CommandError(f'{MODELS[device.model]["label"]} does not support {method.replace("_", " ")}')
+    return fn
+
+
 COMMANDS = {
     'power_on': lambda d, b: d.power_on(),
     'power_off': lambda d, b: d.power_off(),
     'reconnect': lambda d, b: d.handshake(),
-    'refresh_paks': lambda d, b: d.refresh_paks(),
-    'insert_pak': lambda d, b: d.insert_pak(b.get('rfid')),
-    'eject_pak': lambda d, b: d.eject_pak(),
+    'refresh_paks': lambda d, b: supported(d, 'refresh_paks')(),
+    'insert_pak': lambda d, b: supported(d, 'insert_pak')(b.get('rfid')),
+    'eject_pak': lambda d, b: supported(d, 'eject_pak')(),
+    'refresh_menu': lambda d, b: supported(d, 'refresh_menu')(),
+    'select_recipe': lambda d, b: supported(d, 'select_recipe')(b.get('recipe_id')),
     'start_brew': lambda d, b: d.start_brew(),
-    'start_deep_clean': lambda d, b: d.start_deep_clean(),
-    'start_rinse': lambda d, b: d.start_rinse(),
-    'start_sous_vide': lambda d, b: d.start_sous_vide(b.get('temperature'), b.get('minutes')),
+    'start_program': lambda d, b: d.start_program(b.get('program')),
+    'start_sous_vide': lambda d, b: supported(d, 'start_sous_vide')(b.get('temperature'), b.get('minutes')),
+    'resume_session': lambda d, b: supported(d, 'resume_session')(),
     'pause': lambda d, b: d.pause(),
     'resume': lambda d, b: d.resume(),
     'skip_step': lambda d, b: d.skip_step(),
@@ -27,7 +36,7 @@ COMMANDS = {
     'report_error': lambda d, b: d.report_error(b.get('code')),
     'clear_error': lambda d, b: d.clear_error(),
     'check_firmware': lambda d, b: d.check_firmware(),
-    'download_firmware': lambda d, b: d.download_firmware(),
+    'download_firmware': lambda d, b: supported(d, 'download_firmware')(),
     'register_alias': lambda d, b: d.register_alias(),
 }
 
@@ -66,7 +75,7 @@ def list_devices():
 @bp.route('/api/devices', methods=['POST'])
 def create_device():
     body = request.get_json(force=True) or {}
-    device = manager().create(body.get('name'), body.get('model', 'pico_s'), body.get('uid'),
+    device = manager().create(body.get('name'), body.get('model') or 'pico_s', body.get('uid'),
                               body.get('firmware'), body.get('server_url'))
     return jsonify(device.snapshot()), 201
 

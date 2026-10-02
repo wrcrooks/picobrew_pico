@@ -25,8 +25,12 @@ class FlaskTransport:
         resp = self.client.get(urlparse(url).path, query_string=params)
         return FakeResponse(resp.get_data(as_text=True), resp.status_code)
 
-    def post(self, url, params=None, data=None, timeout=None):
-        resp = self.client.post(urlparse(url).path, query_string=params, data=data)
+    def post(self, url, params=None, data=None, json=None, timeout=None):
+        resp = self.client.post(urlparse(url).path, query_string=params, data=data, json=json)
+        return FakeResponse(resp.get_data(as_text=True), resp.status_code)
+
+    def put(self, url, params=None, json=None, timeout=None):
+        resp = self.client.put(urlparse(url).path, query_string=params, json=json)
         return FakeResponse(resp.get_data(as_text=True), resp.status_code)
 
 
