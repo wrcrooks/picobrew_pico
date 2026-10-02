@@ -844,7 +844,12 @@ def increment_session_id(uid):
 
 
 def get_machine_by_session(session_id):
-    return next((uid for uid in active_brew_sessions if active_brew_sessions[uid].session == session_id or active_brew_sessions[uid].id == int(session_id) or active_brew_sessions[uid].id == -1), None)
+    # Exact matches first: id == -1 is also every idle machine's default, so it's only a
+    # fallback (a session reloaded from a corrupted file) when nothing matches exactly.
+    exact = next((uid for uid in active_brew_sessions if active_brew_sessions[uid].session == session_id or active_brew_sessions[uid].id == int(session_id)), None)
+    if exact is not None:
+        return exact
+    return next((uid for uid in active_brew_sessions if active_brew_sessions[uid].id == -1), None)
 
 
 def get_archived_sessions_by_machine(uid):

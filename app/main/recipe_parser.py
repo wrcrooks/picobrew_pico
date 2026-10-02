@@ -484,6 +484,7 @@ class ReduxRecipe():
         # on a real Pico. None until assigned in the editor; not auto-generated here since
         # parse() must stay a pure read with no write side effects.
         self.TagID = recipe.get('TagID') or None
+        self.HideOnMachine = bool(recipe.get('HideOnMachine', False))
         # if 'steps' in recipe:
         #     for recipe_step in recipe['steps']:
         #         step = PicoBrewRecipeStep()
@@ -525,6 +526,86 @@ class ReduxRecipe():
             step.drain_time = int(s.get('Drain') or 0)
             pico.steps.append(step)
         return pico
+
+    # Zymatic/Z-Series ids live in different spaces: the Zymatic uses the 32-char GUID, the Z an
+    # integer. Builder recipes get a GUID-derived Z id offset far above picobrew's own RecipeIDs
+    # (6-7 digits) so they can't collide with legacy Z recipes, and stay under int32.
+    ZSERIES_ID_OFFSET = 1_000_000_000
+
+    @property
+    def zseries_id(self):
+        return self.ZSERIES_ID_OFFSET + int(self.id[:7], 16)
+
+    def machine_problems(self):
+        """Reasons this recipe can't be served to a Zymatic/Z-Series, which will run its
+        MachineSteps on real hardware -- empty when it's safe to serve."""
+        problems = []
+        if self.UseMetric:
+            problems.append('metric recipes are not supported (machine steps must be in °F)')
+        if not self.MachineSteps:
+            problems.append('no machine steps')
+        if len(self.id or '') != 32 or any(c not in '0123456789abcdefABCDEF' for c in self.id):
+            problems.append('recipe has no valid 32-character RecipeGUID')
+        for i, s in enumerate(self.MachineSteps, 1):
+            try:
+                temperature, time, drain = int(s.get('Temperature')), int(s.get('Time')), int(s.get('Drain'))
+            except (TypeError, ValueError):
+                problems.append(f'step {i} has a non-numeric temperature, time or drain')
+                continue
+            if str(s.get('StepLocation')) not in ZSERIES_LOCATION.values():
+                problems.append(f'step {i} has unknown location {s.get("StepLocation")!r}')
+            if not 0 <= temperature <= 212:
+                problems.append(f'step {i} temperature {temperature}°F is outside 0-212°F')
+            if time < 0 or drain < 0:
+                problems.append(f'step {i} has a negative time or drain')
+        return problems
+
+    def _machine_steps(self, step_class):
+        names_by_code = {v: k for k, v in ZSERIES_LOCATION.items()}
+        steps = []
+        for s in self.MachineSteps:
+            step = step_class()
+            step.name = s.get('Name') or 'Empty Step'
+            step.location = names_by_code[str(s['StepLocation'])]
+            step.temperature = int(s['Temperature'])
+            step.step_time = int(s['Time'])
+            step.drain_time = int(s['Drain'])
+            steps.append(step)
+        return steps
+
+    def to_zymatic_recipe(self):
+        """The Zymatic's recipe string is '/'-, ',' and '|'-delimited (and '#'-framed), so
+        those characters can't appear in names. Zymatic and Z-Series share location codes."""
+        def clean(text):
+            for ch in '/|,#':
+                text = text.replace(ch, '-')
+            return text
+
+        zymatic = ZymaticRecipe()
+        zymatic.id = self.id
+        zymatic.name = clean(self.name)
+        zymatic.steps = self._machine_steps(ZymaticRecipeStep)
+        for step in zymatic.steps:
+            step.name = clean(step.name)
+        return zymatic
+
+    def to_zseries_recipe(self):
+        zseries = ZSeriesRecipe()
+        zseries.id = self.zseries_id
+        zseries.name = self.name
+        zseries.kind_code = 0
+        # StartWater is liters on the Z (its 13.1 default is ~3.5 gal; 13.1 gal can't fit
+        # the 5 gal brew keg); recipes store H2O in gallons.
+        if self.H2O:
+            zseries.start_water = round(float(self.H2O) * 3.78541, 1)
+        zseries.steps = self._machine_steps(ZSeriesRecipeStep)
+        return zseries
+
+    def set_hide_on_machine(self, hidden):
+        self._raw['HideOnMachine'] = bool(hidden)
+        with open(self.filepath, 'w') as out:
+            json.dump(self._raw, out, indent=4, sort_keys=True)
+        self.HideOnMachine = bool(hidden)
 
     def update_from_form(self, form):
         """Apply edits posted from recipe_editor.html onto the original raw recipe

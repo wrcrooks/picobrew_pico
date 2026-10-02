@@ -9,7 +9,7 @@ from .. import socketio
 from . import main
 from .config import brew_active_sessions_path
 from .model import MachineType, PicoBrewSession
-from .routes_frontend import get_zymatic_recipes
+from .routes_frontend import get_zymatic_recipes, machine_redux_recipes
 from .session_parser import active_brew_sessions
 
 
@@ -231,16 +231,26 @@ def get_zymatic_recipe_list(clean):
             recipe_list_clean += r.serialize()
         else:
             recipe_list_brew += r.serialize()
-    return recipe_list_clean if clean else recipe_list_brew
+    if clean:
+        return recipe_list_clean
+    for r in machine_redux_recipes():
+        recipe_list_brew += r.to_zymatic_recipe().serialize()
+    return recipe_list_brew
+
+
+def all_zymatic_recipes():
+    """Legacy Zymatic recipes, then builder recipes (hidden ones included -- lookups must still
+    resolve a session started before its recipe was hidden)."""
+    return list(get_zymatic_recipes(False)) + [r.to_zymatic_recipe() for r in machine_redux_recipes(include_hidden=True)]
 
 
 def get_recipe_name_by_id(recipe_id):
-    recipe = next((r for r in get_zymatic_recipes(False) if r.id == recipe_id), None)
+    recipe = next((r for r in all_zymatic_recipes() if r.id == recipe_id), None)
     return 'Invalid Recipe' if not recipe else recipe.name
 
 
 def get_recipe_by_name(recipe_name):
-    recipe = next((r for r in get_zymatic_recipes(False) if r.name == recipe_name), None)
+    recipe = next((r for r in all_zymatic_recipes() if r.name == recipe_name), None)
     return '' if not recipe else recipe.serialize()
 
 

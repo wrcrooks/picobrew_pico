@@ -34,7 +34,15 @@
               <h3 class="mb-0">{{recipe['name']}}</h3>
               <small class="text-muted">CREATED BY: <strong>{{recipe['author']}}</strong></small>
               <div>{{ recipe['Machine'] }}</div>
-          </div>  
+              <div class="custom-control custom-switch mt-1">
+                <input type="checkbox" class="custom-control-input hide-on-machine" id="hide-on-machine-{{ recipe['id'] }}"
+                       data-recipe-id="{{ recipe['id'] }}" {{ 'checked' if recipe['HideOnMachine'] }}
+                       aria-describedby="machine-status-{{ recipe['id'] }}">
+                <label class="custom-control-label small" for="hide-on-machine-{{ recipe['id'] }}">Hide on Machine</label>
+              </div>
+              <small class="text-muted d-block" id="machine-status-{{ recipe['id'] }}"
+                     data-problems="{{ recipe['machine_problems'] | join('; ') }}" data-has-tag="{{ 'yes' if recipe['TagID'] }}"></small>
+          </div>
           <div class="col-2 text-start border-start px-3">
               <div class="small d-block text-muted">Brewed: <b>1 time</b></div>
               <div class="small d-block text-muted">Last Brewed:</div>
@@ -95,3 +103,40 @@
     {% endfor %}
 
 </div>
+<script>
+  // "Hide on Machine" keeps a recipe off the Zymatic, Z-Series and Pico recipe menus.
+  function describeMachineStatus(input) {
+    var status = document.getElementById('machine-status-' + input.dataset.recipeId);
+    var problems = status.dataset.problems;
+    if (problems) {
+      status.textContent = 'Not sent to Zymatic/Z-Series: ' + problems;
+    } else {
+      status.textContent = input.checked ? 'Hidden from machine menus'
+        : 'Shown on Zymatic and Z-Series menus' + (status.dataset.hasTag ? ' and in the Pico PicoPak list' : '');
+    }
+  }
+
+  document.querySelectorAll('.hide-on-machine').forEach(function (input) {
+    describeMachineStatus(input);
+    input.addEventListener('change', function () {
+      var wanted = input.checked;
+      input.disabled = true;
+      fetch('/recipe/' + encodeURIComponent(input.dataset.recipeId) + '/hide_on_machine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hidden: wanted })
+      }).then(function (resp) {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        return resp.json();
+      }).then(function (data) {
+        input.checked = data.hidden;
+      }).catch(function (err) {
+        input.checked = !wanted;
+        alert('Could not update "Hide on Machine": ' + err.message);
+      }).finally(function () {
+        input.disabled = false;
+        describeMachineStatus(input);
+      });
+    });
+  });
+</script>

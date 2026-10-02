@@ -528,6 +528,8 @@ def _recipes():
             print(s['alias'])
             #TODO: Get recipe brew count and last brew date
     recipes_dict = [json.loads(json.dumps(recipe, default=lambda r: r.__dict__)) for recipe in redux_recipes]
+    for d, recipe in zip(recipes_dict, redux_recipes):
+        d['machine_problems'] = recipe.machine_problems()
     return render_template_with_defaults('redux_recipes.html', recipes=recipes_dict, invalid=invalid_recipes.get(MachineType.ZSERIES, set()), SRM_COLOR_DATA=SRM_COLOR_DATA)
 
 #   Recipe: /API/pico/getRecipe?rfid={rfid}
@@ -957,6 +959,32 @@ def _recipe_new_from_style():
     for guide_styles in styles_by_guide.values():
         guide_styles.sort(key=lambda s: (int(s.get('CatNumCode') or 0), s.get('CatLettCode') or '', s['StyleNameCode']))
     return render_template_with_defaults('new_recipe_from_style.html', styles_by_guide=styles_by_guide, machine_presets=MACHINE_BATCH_PRESETS)
+
+
+def machine_redux_recipes(include_hidden=False):
+    """Active builder recipes that are safe to serve to a Zymatic/Z-Series. Menus pass
+    include_hidden=False so "Hide on Machine" drops them; lookups by id/name include hidden
+    ones so a session started before the recipe was hidden still resolves."""
+    recipes = []
+    for r in load_redux_recipes(False):
+        problems = r.machine_problems()
+        if problems:
+            current_app.logger.debug(f'not serving recipe "{r.name}" to machines: {"; ".join(problems)}')
+        elif include_hidden or not r.HideOnMachine:
+            recipes.append(r)
+    return recipes
+
+
+@main.route('/recipe/<rfid>/hide_on_machine', methods=['POST'])
+def _recipe_hide_on_machine(rfid):
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body.get('hidden'), bool):
+        return jsonify({'error': '"hidden" must be true or false'}), 400
+    recipe = next((r for r in load_redux_recipes() if r.id == rfid), None)
+    if recipe is None:
+        return jsonify({'error': 'Recipe not found'}), 404
+    recipe.set_hide_on_machine(body['hidden'])
+    return jsonify({'id': recipe.id, 'hidden': recipe.HideOnMachine})
 
 
 @main.route('/recipe/edit/<rfid>', methods=['GET', 'POST'])

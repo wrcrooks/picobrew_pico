@@ -12,7 +12,7 @@ from . import main
 from .config import MachineType, brew_active_sessions_path, firmware_path
 from .firmware import firmware_filename, firmware_upgrade_required, minimum_firmware
 from .model import PicoBrewSession
-from .routes_frontend import get_zseries_recipes
+from .routes_frontend import get_zseries_recipes, machine_redux_recipes
 from .session_parser import (active_brew_sessions, reason_phrase, dirty_sessions_since_clean,
                              get_machine_by_session, increment_session_id, last_session_type, ZSessionType)
 from .units import convert_temp
@@ -578,7 +578,7 @@ def process_recover_session(token, session_id):
 
     active_session = active_brew_sessions[uid]
 
-    if active_session.id == session_id:   # session_id is hex string; session.id is number
+    if str(active_session.id) == str(session_id):   # session_id comes from the query string; session.id is a number
         recipe = get_recipe_by_name(active_session.name)
         current_step = active_session.recovery
         remaining_time = active_session.remaining_time
@@ -607,7 +607,7 @@ def process_recover_session(token, session_id):
             recipe.steps = steps
 
         ret = {
-            "Recipe": json.loads(recipe.serialize()),
+            "Recipe": recipe.serialize(),
             "SessionID": active_session.id,
             "SessionType": active_session.type,
             "ZPicoRecipe": None                         # does this identity the Z pak recipe?
@@ -630,7 +630,8 @@ def get_zseries_recipe_list():
 
 def get_zseries_recipe_metadata_list():
     recipe_metadata = []
-    for r in get_zseries_recipes(False):
+    builder = [r.to_zseries_recipe() for r in machine_redux_recipes()]
+    for r in list(get_zseries_recipes(False)) + builder:
         meta = {
             "ID": r.id,
             "Name": r.name,
@@ -643,11 +644,17 @@ def get_zseries_recipe_metadata_list():
     return recipe_metadata
 
 
+def all_zseries_recipes():
+    """Legacy Z-Series recipes, then builder recipes (hidden ones included -- lookups must
+    still resolve a session started before its recipe was hidden)."""
+    return list(get_zseries_recipes(False)) + [r.to_zseries_recipe() for r in machine_redux_recipes(include_hidden=True)]
+
+
 def get_recipe_by_id(recipe_id):
-    recipe = next((r for r in get_zseries_recipes(False) if str(r.id) == str(recipe_id)), None)
+    recipe = next((r for r in all_zseries_recipes() if str(r.id) == str(recipe_id)), None)
     return recipe
 
 
 def get_recipe_by_name(recipe_name):
-    recipe = next((r for r in get_zseries_recipes(False) if r.name == recipe_name), None)
+    recipe = next((r for r in all_zseries_recipes() if r.name == recipe_name), None)
     return recipe

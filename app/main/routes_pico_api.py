@@ -332,7 +332,7 @@ def get_recipe_list():
     for r in get_pico_recipes(False):
         recipe_list += f'{r.id},{r.name}|'
     for r in load_redux_recipes(False):
-        if r.TagID:
+        if r.TagID and not r.HideOnMachine:
             recipe_list += f'{r.TagID},{r.name}|'
     return recipe_list
 
