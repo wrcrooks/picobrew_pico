@@ -57,16 +57,17 @@
                 <i class="fas fa-pencil"></i>
               </button>
               </a>
-              <a href="{{ url_for('main._recipe_clone', rfid=recipe['id']) }}">
-              <button class="btn btn-sm btn-info">
-                <i class="fas fa-copy"></i>
-              </button>
-              </a>
-              <a href="{{ url_for('main._recipe_delete', rfid=recipe['id']) }}">
-              <button class="btn btn-sm btn-danger">
-                <i class="fas fa-trash"></i>
-              </button>
-              </a>
+              <form method="POST" action="{{ url_for('main._recipe_clone', rfid=recipe['id']) }}" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-info" title="Clone this recipe and open the copy in the editor">
+                  <i class="fas fa-copy"></i>
+                </button>
+              </form>
+              <form method="POST" action="{{ url_for('main._recipe_delete', rfid=recipe['id']) }}" class="d-inline confirm-delete"
+                    data-recipe-name="{{ recipe['name'] }}">
+                <button type="submit" class="btn btn-sm btn-danger" title="Delete this recipe">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
           </div>
           <div class="col-3">
             <div class="row align-items-center">
@@ -115,6 +116,12 @@
         : 'Shown on Zymatic and Z-Series menus' + (status.dataset.hasTag ? ' and in the Pico PicoPak list' : '');
     }
   }
+
+  document.querySelectorAll('form.confirm-delete').forEach(function (form) {
+    form.addEventListener('submit', function (event) {
+      if (!confirm('Delete "' + form.dataset.recipeName + '"? This cannot be undone.')) event.preventDefault();
+    });
+  });
 
   document.querySelectorAll('.hide-on-machine').forEach(function (input) {
     describeMachineStatus(input);

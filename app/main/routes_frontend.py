@@ -927,9 +927,7 @@ def generate_recipe_from_style(style, batch_size, suggestions, machine='Custom')
             'Content': {'Sections': [{'Stats': water_stats}], 'SpecialBrewingInstructions': ''},
         },
     }
-    safe_name = recipe_name.replace(' ', '_').replace("'", '').replace('/', '-')
-    filename = recipe_path(MachineType.UNIFIED).joinpath(f'{safe_name}.json')
-    with open(filename, 'w') as f:
+    with open(recipe_filename(recipe_name), 'w') as f:
         json.dump(full_json, f, indent=4, sort_keys=True)
     return new_guid
 
@@ -1025,19 +1023,42 @@ def _recipe_edit(rfid):
 
     return render_template_with_defaults('recipe_editor.html', recipe=recipe, grain_data=GRAIN_BILL_DATA, hops_data=HOPS_BILL_DATA, wortCurveData=wortCurveData, bjcp_2008_substyles=bjcp_2008_substyles, location_options=location_options, machine_presets=MACHINE_BATCH_PRESETS, machine_fixed_water=MACHINE_FIXED_WATER_GAL, fermentation_types=FERMENTATION_TYPES, **recipe_derived_values(recipe))
 
-@main.route('/recipe/clone/<rfid>', methods=['GET'])
-def _recipe_clone(rfid):
-    # if request.method == 'DELETE':
-    newID = uuid.uuid4().hex[:32]
-    print(rfid + " : " + request.method)
-    print("New ID:" + newID)
-    return '', 204
+def recipe_filename(name):
+    return recipe_path(MachineType.UNIFIED).joinpath('{}.json'.format(name.strip().replace(' ', '_').replace("'", '').replace('/', '-')))
 
-@main.route('/recipe/delete/<rfid>', methods=['GET'])
+
+@main.route('/recipe/clone/<rfid>', methods=['POST'])
+def _recipe_clone(rfid):
+    recipes = load_redux_recipes()
+    source = next((r for r in recipes if r.id == rfid), None)
+    if source is None:
+        return 'Recipe not found', 404
+
+    taken = {r.name for r in recipes}
+    name, n = f'{source.name} (copy)', 1
+    while name in taken or recipe_filename(name).exists():
+        n += 1
+        name = f'{source.name} (copy {n})'
+
+    raw = json.loads(json.dumps(source._raw))
+    new_guid = uuid.uuid4().hex
+    raw['RecipeGUID'] = new_guid
+    raw['TagID'] = None         # a physical tag can only resolve to one recipe
+    r = raw['VM']['Recipe']
+    r.update(GUID=new_guid, PreviousGUID=source.id, RecipeID=0, Name=name,
+             CreationDate=datetime.now().isoformat())
+    with open(recipe_filename(name), 'w') as f:
+        json.dump(raw, f, indent=4, sort_keys=True)
+    return redirect(url_for('main._recipe_edit', rfid=new_guid))
+
+@main.route('/recipe/delete/<rfid>', methods=['POST'])
 def _recipe_delete(rfid):
-    # if request.method == 'DELETE':
-    print(rfid + " : " + request.method)
-    return '', 204
+    recipe = next((r for r in load_redux_recipes() if r.id == rfid), None)
+    if recipe is None:
+        return 'Recipe not found', 404
+    os.remove(recipe.filepath)
+    current_app.logger.info(f'deleted recipe "{recipe.name}" ({recipe.id})')
+    return redirect(url_for('main._recipes'))
 
 
 # Maps each ingredients-page category to the field that identifies an entry, used both to
